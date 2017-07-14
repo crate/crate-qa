@@ -10,13 +10,14 @@ supported.
 import argparse
 import logging
 import re
-import sys
-import time
+import threading
 from functools import partial
 from hashlib import md5
 
 import common
 import psycopg2
+import sys
+import time
 
 QUERY_WHITELIST = [re.compile(o, re.IGNORECASE) for o in [
     'CREATE INDEX.*',  # CREATE INDEX is not supported, but raises SQLParseException
@@ -36,7 +37,7 @@ real_to_double = partial(re.compile('REAL').sub, 'DOUBLE')
 text_to_string = partial(re.compile('TEXT').sub, 'STRING')
 
 
-class IncorrectResult(BaseException):
+class IncorrectResult(Exception):
     pass
 
 
@@ -47,12 +48,16 @@ def cratify_stmt(stmt):
 class Command:
     query = None
 
-    def __init__(self, query):
+    def __init__(self, query, line_num, pos):
         self.query = cratify_stmt(query)
+        self.line_num = line_num
+        self.pos = pos
 
+    def __str__(self):
+        return f'{self.pos}:{self.line_num} {self.query}'
 
 class Statement(Command):
-    def __init__(self, cmd):
+    def __init__(self, cmd, line_num, pos):
         """Create a statement
 
         A statement is usually a DML statement that is expected to either work
@@ -63,7 +68,7 @@ class Statement(Command):
             statement [ok | error]
             <statement>
         """
-        super().__init__(' '.join(cmd[1:]))
+        super().__init__(' '.join(cmd[1:]), line_num, pos)
         self.expect_ok = cmd[0].endswith('ok')
 
     def execute(self, cursor):
@@ -73,7 +78,7 @@ class Statement(Command):
             if self.expect_ok:
                 raise IncorrectResult(e)
 
-    def __repr__(self):
+    def x__repr__(self):
         return 'Statement<{0:.30}>'.format(self.query)
 
 
@@ -96,7 +101,7 @@ class Query(Command):
     HASHING_RE = re.compile('(\d+) values hashing to ([a-z0-9]+)')
     VALID_RESULT_FORMATS = set('TIR')
 
-    def __init__(self, cmd):
+    def __init__(self, cmd, line_num, pos):
         """Create a query
 
         cmd format is:
@@ -139,11 +144,11 @@ class Query(Command):
         self.result = None
         for i, line in enumerate(cmd):
             if line.startswith('---'):
-                super().__init__(' '.join(cmd[1:i]))
+                super().__init__(' '.join(cmd[1:i]), line_num, pos)
                 self.result = cmd[i + 1:]
                 break
         else:
-            super().__init__(' '.join(cmd[1:]))
+            super().__init__(' '.join(cmd[1:]), line_num, pos)
 
         __, result_formats, sort, *__ = cmd[0].split()
         if result_formats and not (set(result_formats) & Query.VALID_RESULT_FORMATS):
@@ -218,12 +223,12 @@ class Query(Command):
             rows = sorted(rows, key=lambda v: str(v))
         self.validate_result(rows, self.result_formats)
 
-    def __repr__(self):
+    def x__repr__(self):
         return 'Query<{0}, {1}, {2:.30}>'.format(
             self.result_formats, self.sort, self.query)
 
 
-def parse_cmd(cmd):
+def parse_cmd(cmd, line_num, pos):
     """Parse a command into Statement or Query
 
     >>> parse_cmd(['statement ok', 'INSERT INTO tab0 VALUES(35,97,1)'])
@@ -253,9 +258,9 @@ def parse_cmd(cmd):
         cmd.pop(0)
         type_ = cmd[0]
     if type_.startswith('statement'):
-        return Statement(cmd)
+        return Statement(cmd, line_num, pos)
     if type_.startswith('query'):
-        return Query(cmd)
+        return Query(cmd, line_num, pos)
     if type_.startswith('halt'):
         return None
     raise ValueError('Could not parse command: {0}'.format(cmd))
@@ -322,6 +327,9 @@ class PosFilter(logging.Filter):
 
 
 class Stats:
+
+    lock = threading.Lock()
+
     failures = 0
     whitelisted = 0
     lines = 0
@@ -335,6 +343,13 @@ class Stats:
     def __str__(self):
         return f'{self.filename}\t{self.lines}\t{self.commands}\t{self.success}\t{self.whitelisted}\t{self.unsupported}\t{self.failures}'
 
+    def __setattr__(self, name, value):
+        if name in ('failures', 'whitelisted', 'lines', 'commands', 'success', 'unsupported'):
+            with self.lock:
+                super().__setattr__(name, value)
+        else:
+            super().__setattr__(name, value)
+
 
 def version_string(version):
     s = version['number']
@@ -346,7 +361,7 @@ def version_string(version):
 class Runner:
     conn = None
 
-    def __init__(self, host, port, log_level, log_file, failfast):
+    def __init__(self, host, port, log_level, log_file, failfast, num_threads):
         self.failfast = failfast
         self.log_file = log_file
         self.log_level = log_level
@@ -355,13 +370,14 @@ class Runner:
         self.logger = self.get_logger()
         self.posFilter = PosFilter()
         self.logger.addFilter(self.posFilter)
+        self.ex = common.PoolExectuor(num_threads, host=self.host, port=self.port)
 
     def get_logger(self):
         logger = logging.getLogger('sqllogic')
         logger.setLevel(self.log_level)
         handler = logging.FileHandler(self.log_file) if self.log_file else logging.StreamHandler(sys.stderr)
         handler.setLevel(self.log_level)
-        handler.setFormatter(logging.Formatter('%(levelname)s %(testfile)s:%(line_num)s %(pos)s %(message)s'))
+        handler.setFormatter(logging.Formatter('%(levelname)s %(testfile)s %(message)s'))
         logger.addHandler(handler)
         return logger
 
@@ -380,71 +396,94 @@ class Runner:
                 stats = self.run_file(f)
                 yield stats
 
+    def synchronized_execute(self, cmd, cursor):
+        try:
+            cmd.execute(cursor)
+        except Exception as e:
+            self.after_execute(cmd, e)
+        self.after_execute(cmd, None)
+
+    def after_execute(self, s_or_q, e):
+        msg = None
+        try:
+            if e is not None:
+                msg = str(e).strip()
+                raise e
+            # self.logger.debug('EX time: {0:.4f}'.format(time.time() - t))
+            self.stats.success += 1
+        except psycopg2.InternalError as e:
+            # msg = str(e).strip()
+            if msg.startswith('UnsupportedFeatureException') or msg.endswith(' is not supported'):
+                self.logger.info(f'EX UNSUPORTED: {msg} {s_or_q}')
+                self.stats.unsupported += 1
+            else:
+                self.logger.error(f'EX PG ERROR: {msg} {s_or_q}')
+                self.stats.failures += 1
+                if self.failfast:
+                    fail = True
+                    for s in KNOWN_BUGS_EXCEPTIONS:
+                        if s in msg:
+                            fail = False
+                            break
+                    if fail:
+                        import pdb;
+                        pdb.set_trace()
+                        raise e
+        except psycopg2.Error as e:
+            self.logger.error(f'EX PG ERROR: {msg} {s_or_q}')
+            self.stats.failures += 1
+            if self.failfast:
+                raise e
+        except IncorrectResult as e:
+            if not any(p.match(s_or_q.query) for p in QUERY_WHITELIST):
+                self.logger.error(f'EX INCORRECT {msg} {s_or_q}')
+                self.stats.failures += 1
+                if self.failfast:
+                    raise e
+            else:
+                self.stats.whitelisted += 1
+                self.logger.info(f'EX WHITELISTED: {msg} {s_or_q}')
+
     def run_file(self, fh):
         self.connect()
-        stats = Stats(fh.name)
+        self.stats = Stats(fh.name)
         self.posFilter.current_file = fh.name
         cursor = self.conn.cursor()
         commands = get_commands(fh)
         commands = (cmd for cmd in commands if _exec_on_crate(cmd[1]))
         dml_done = False
+        pos = -1
         try:
             for line_num, cmd in commands:
-                self.posFilter.next_cmd(line_num)
-                stats.lines = line_num
-                stats.commands += 1
+                pos += 1
+                self.stats.lines = line_num
+                self.stats.commands += 1
                 try:
-                    s_or_q = parse_cmd(cmd)
+                    s_or_q = parse_cmd(cmd, line_num, pos)
                 except Exception as e:
                     self.logger.error(f'COMMAND PARSE FAILURE: {cmd}')
                     raise e
                 if not s_or_q:
                     self.logger.debug('HALT')
                     break
-                self.logger.debug('EX: {0}'.format(s_or_q.query))
-                if not dml_done and isinstance(s_or_q, Query):
+                self.logger.debug(f'EX: {s_or_q}')
+
+                is_dql = isinstance(s_or_q, Query)
+
+                if not dml_done and is_dql:
                     dml_done = True
                     _refresh_tables(cursor)
+
                 t = time.time()
-                try:
-                    s_or_q.execute(cursor)
-                    self.logger.debug('EX time: {0:.4f}'.format(time.time() - t))
-                    stats.success += 1
-                except psycopg2.InternalError as e:
-                    msg = str(e).strip()
-                    if msg.startswith('UnsupportedFeatureException') or msg.endswith(' is not supported'):
-                        self.logger.info('EX UNSUPORTED: {0}'.format(msg))
-                        stats.unsupported += 1
-                    else:
-                        self.logger.error('EX PG ERROR: {0}'.format(e))
-                        stats.failures += 1
-                        if self.failfast:
-                            fail = True
-                            for s in KNOWN_BUGS_EXCEPTIONS:
-                                if s in msg:
-                                    fail = False
-                                    break
-                            if fail:
-                                import pdb; pdb.set_trace()
-                                raise e
-                except psycopg2.Error as e:
-                    self.logger.error('EX PG ERROR: {0}'.format(e))
-                    stats.failures += 1
-                    if self.failfast:
-                        raise e
-                except IncorrectResult as e:
-                    if not any(p.match(s_or_q.query) for p in QUERY_WHITELIST):
-                        self.logger.error('EX INCORRECT {0}'.format(e))
-                        stats.failures += 1
-                        if self.failfast:
-                            raise e
-                    else:
-                        stats.whitelisted += 1
-                        self.logger.info('EX WHITELISTED: {0}'.format(e))
+                if is_dql:
+                    self.ex.execute(s_or_q, self.after_execute)
+                else:
+                    self.synchronized_execute(s_or_q, cursor)
         finally:
+            self.ex.join()
             _drop_tables(cursor)
             cursor.close()
-        return stats
+        return self.stats
 
 
 def main():
@@ -457,8 +496,9 @@ def main():
     parser.add_argument('--failfast',
                         action='store_true', default=False,
                         help='Fail on first error.')
+    parser.add_argument('-n', type=int, default=8, help='Number of parallel queries')
     args = parser.parse_args()
 
-    r = Runner(args.host, args.port, args.log_level, None, args.failfast)
+    r = Runner(args.host, args.port, args.log_level, None, args.failfast, args.n)
     for stats in r.run_files(args.testfiles):
-        print(stats)
+        print(f'{r.version}\t{stats}')

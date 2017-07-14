@@ -11,10 +11,10 @@ def main():
     parser.add_argument('testfiles', nargs='*')
     parser.add_argument('--out', help="output file", type=argparse.FileType('a', encoding='utf-8'), default=sys.stdout)
     args = parser.parse_args()
-    versions = ['1.0.x', '1.1.x', '2.0.x', 'latest-nightly']
+    versions = ['1.0.x', '1.1.x', '2.0.x', '2.1.x']
     with args.out as outfile:
         for version in versions:
-            r = sqllogictest.Runner('localhost', '5432', logging.WARNING, None, False)
+            r = sqllogictest.Runner('localhost', '5432', logging.WARNING, None, False, 8)
             with run_crate.create_node(version, None, None, None, False) as n:
                 n.start()
                 for testfile in args.testfiles:
