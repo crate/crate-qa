@@ -35,6 +35,7 @@ KNOWN_BUGS_EXCEPTIONS = [
 varchar_to_string = partial(re.compile('VARCHAR\(\d+\)').sub, 'STRING')
 real_to_double = partial(re.compile('REAL').sub, 'DOUBLE')
 text_to_string = partial(re.compile('TEXT').sub, 'STRING')
+no_unique = partial(re.compile(' UNIQUE').sub, '')
 
 
 class IncorrectResult(Exception):
@@ -42,22 +43,27 @@ class IncorrectResult(Exception):
 
 
 def cratify_stmt(stmt):
-    return text_to_string(real_to_double(varchar_to_string(stmt)))
+    return no_unique(text_to_string(real_to_double(varchar_to_string(stmt))))
 
 
 class Command:
     query = None
 
-    def __init__(self, query, line_num, pos):
-        self.query = cratify_stmt(query)
+    def __init__(self, query, line_num, pos, db):
+        self.db = db;
+        if db == 'crate':
+            self.query = cratify_stmt(query)
+        else:
+            self.query = query
         self.line_num = line_num
         self.pos = pos
 
     def __str__(self):
         return f'{self.pos}:{self.line_num} {self.query}'
 
+
 class Statement(Command):
-    def __init__(self, cmd, line_num, pos):
+    def __init__(self, cmd, line_num, pos, db):
         """Create a statement
 
         A statement is usually a DML statement that is expected to either work
@@ -68,7 +74,7 @@ class Statement(Command):
             statement [ok | error]
             <statement>
         """
-        super().__init__(' '.join(cmd[1:]), line_num, pos)
+        super().__init__(' '.join(cmd[1:]), line_num, pos, db)
         self.expect_ok = cmd[0].endswith('ok')
 
     def execute(self, cursor):
@@ -76,7 +82,7 @@ class Statement(Command):
             cursor.execute(self.query)
         except psycopg2.Error as e:
             if self.expect_ok:
-                raise IncorrectResult(e)
+                raise e
 
     def x__repr__(self):
         return 'Statement<{0:.30}>'.format(self.query)
@@ -101,7 +107,7 @@ class Query(Command):
     HASHING_RE = re.compile('(\d+) values hashing to ([a-z0-9]+)')
     VALID_RESULT_FORMATS = set('TIR')
 
-    def __init__(self, cmd, line_num, pos):
+    def __init__(self, cmd, line_num, pos, db):
         """Create a query
 
         cmd format is:
@@ -144,11 +150,11 @@ class Query(Command):
         self.result = None
         for i, line in enumerate(cmd):
             if line.startswith('---'):
-                super().__init__(' '.join(cmd[1:i]), line_num, pos)
+                super().__init__(' '.join(cmd[1:i]), line_num, pos, db)
                 self.result = cmd[i + 1:]
                 break
         else:
-            super().__init__(' '.join(cmd[1:]), line_num, pos)
+            super().__init__(' '.join(cmd[1:]), line_num, pos, db)
 
         __, result_formats, sort, *__ = cmd[0].split()
         if result_formats and not (set(result_formats) & Query.VALID_RESULT_FORMATS):
@@ -213,7 +219,6 @@ class Query(Command):
         try:
             rows = self.format_rows(fetched_rows)
         except Exception as e:
-            import pdb; pdb.set_trace()
             raise e
         if len(rows) > 1 and self.sort == 'rowsort':
             rows = sorted(rows, key=lambda row: [str(c) for c in row])
@@ -226,44 +231,6 @@ class Query(Command):
     def x__repr__(self):
         return 'Query<{0}, {1}, {2:.30}>'.format(
             self.result_formats, self.sort, self.query)
-
-
-def parse_cmd(cmd, line_num, pos):
-    """Parse a command into Statement or Query
-
-    >>> parse_cmd(['statement ok', 'INSERT INTO tab0 VALUES(35,97,1)'])
-    Statement
-
-    >>> parse_cmd([
-    ...     'query III rowsort',
-    ...     'SELECT ALL * FROM tab0 AS cor0',
-    ...     '---',
-    ...     '9 values hashing to 38a1673e2e09d694c8cec45c797034a7',
-    ... ])
-    Query
-
-    >>> parse_cmd([
-    ...     'skipif mysql # not compatible',
-    ...     'query I rowsort label-208',
-    ...     'SELECT - col1 / col2 col2 FROM tab1 AS cor0',
-    ...     '----',
-    ...     '0',
-    ...     '0',
-    ...     '0'
-    ... ])
-    Query
-    """
-    type_ = cmd[0]
-    while type_.startswith(('skipif', 'onlyif')):
-        cmd.pop(0)
-        type_ = cmd[0]
-    if type_.startswith('statement'):
-        return Statement(cmd, line_num, pos)
-    if type_.startswith('query'):
-        return Query(cmd, line_num, pos)
-    if type_.startswith('halt'):
-        return None
-    raise ValueError('Could not parse command: {0}'.format(cmd))
 
 
 def get_commands(lines):
@@ -297,20 +264,6 @@ def _exec_on_crate(cmd):
     return True
 
 
-def _refresh_tables(cursor):
-    cursor.execute("select table_name from information_schema.tables where table_schema = 'doc'")
-    rows = cursor.fetchall()
-    for (table,) in rows:
-        cursor.execute('refresh table ' + table)
-
-
-def _drop_tables(cursor):
-    cursor.execute("select table_name from information_schema.tables where table_schema = 'doc'")
-    rows = cursor.fetchall()
-    for (table,) in rows:
-        cursor.execute('drop table ' + table)
-
-
 class PosFilter(logging.Filter):
     line_num = 0
     pos = -1
@@ -320,14 +273,13 @@ class PosFilter(logging.Filter):
         self.line_num = line_num
 
     def filter(self, record):
-        record.pos = self.pos;
+        record.pos = self.pos
         record.testfile = self.current_file
         record.line_num = self.line_num
         return True
 
 
 class Stats:
-
     lock = threading.Lock()
 
     failures = 0
@@ -360,17 +312,55 @@ def version_string(version):
 
 class Runner:
     conn = None
+    created_tables = []
 
-    def __init__(self, host, port, log_level, log_file, failfast, num_threads):
+    def __init__(self, dsn, log_level, log_file, failfast, num_threads):
+        self.db, dsn = common.split_dsn(dsn)
+        self.dsn = f'postgresql://{dsn}'
         self.failfast = failfast
         self.log_file = log_file
         self.log_level = log_level
-        self.port = port
-        self.host = host
         self.logger = self.get_logger()
         self.posFilter = PosFilter()
         self.logger.addFilter(self.posFilter)
-        self.ex = common.PoolExectuor(num_threads, host=self.host, port=self.port)
+        self.ex = common.PoolExectuor(num_threads, self.dsn)
+
+    def parse_cmd(self, cmd, line_num, pos):
+        """Parse a command into Statement or Query
+
+        >>> parse_cmd(['statement ok', 'INSERT INTO tab0 VALUES(35,97,1)'])
+        Statement
+
+        >>> parse_cmd([
+        ...     'query III rowsort',
+        ...     'SELECT ALL * FROM tab0 AS cor0',
+        ...     '---',
+        ...     '9 values hashing to 38a1673e2e09d694c8cec45c797034a7',
+        ... ])
+        Query
+
+        >>> parse_cmd([
+        ...     'skipif mysql # not compatible',
+        ...     'query I rowsort label-208',
+        ...     'SELECT - col1 / col2 col2 FROM tab1 AS cor0',
+        ...     '----',
+        ...     '0',
+        ...     '0',
+        ...     '0'
+        ... ])
+        Query
+        """
+        type_ = cmd[0]
+        while type_.startswith(('skipif', 'onlyif')):
+            cmd.pop(0)
+            type_ = cmd[0]
+        if type_.startswith('statement'):
+            return Statement(cmd, line_num, pos, self.db)
+        if type_.startswith('query'):
+            return Query(cmd, line_num, pos, self.db)
+        if type_.startswith('halt'):
+            return None
+        raise ValueError('Could not parse command: {0}'.format(cmd))
 
     def get_logger(self):
         logger = logging.getLogger('sqllogic')
@@ -384,10 +374,14 @@ class Runner:
     def connect(self):
         if self.conn != None:
             return
-        self.conn = common.db_connection(self.host, self.port)
+        self.conn = common.db_connection(self.dsn)
         with self.conn.cursor() as c:
-            c.execute('select version from sys.nodes limit 1');
-            self.version = version_string(c.fetchone()[0])
+            if self.db == 'crate':
+                c.execute('select version from sys.nodes limit 1');
+                self.version = version_string(c.fetchone()[0])
+            elif self.db == 'postgresql':
+                c.execute("select split_part(version(), ' ', 2)")
+                self.version = c.fetchone()[0]
         return self.conn
 
     def run_files(self, paths):
@@ -459,7 +453,7 @@ class Runner:
                 self.stats.lines = line_num
                 self.stats.commands += 1
                 try:
-                    s_or_q = parse_cmd(cmd, line_num, pos)
+                    s_or_q = self.parse_cmd(cmd, line_num, pos)
                 except Exception as e:
                     self.logger.error(f'COMMAND PARSE FAILURE: {cmd}')
                     raise e
@@ -472,7 +466,9 @@ class Runner:
 
                 if not dml_done and is_dql:
                     dml_done = True
-                    _refresh_tables(cursor)
+                    self._refresh_tables(cursor)
+                    if self.stats.failures > 0:
+                        raise Exception("DML failures, so stopping")
 
                 t = time.time()
                 if is_dql:
@@ -481,9 +477,31 @@ class Runner:
                     self.synchronized_execute(s_or_q, cursor)
         finally:
             self.ex.join()
-            _drop_tables(cursor)
+            self._drop_tables(cursor)
             cursor.close()
         return self.stats
+
+    def _refresh_tables(self, cursor):
+        try:
+            cursor.execute("select table_name from information_schema.tables where table_schema = current_schema")
+        except Exception as e:
+            import pdb;
+            pdb.set_trace()
+            raise e
+        self.created_tables = [r[0] for r in cursor.fetchall()]
+
+        if self.db != 'crate':
+            return
+        for table in self.created_tables:
+            cursor.execute(f'refresh table {table}')
+
+    def _drop_tables(self, cursor):
+        for table in self.created_tables:
+            if self.db == 'crate':
+                cursor.execute(f'drop table if exists "{table}"')
+            else:
+                cursor.execute(f'drop table if exists "{table}" cascade')
+
 
 
 def main():
@@ -499,6 +517,6 @@ def main():
     parser.add_argument('-n', type=int, default=8, help='Number of parallel queries')
     args = parser.parse_args()
 
-    r = Runner(args.host, args.port, args.log_level, None, args.failfast, args.n)
+    r = Runner(args.dsn, args.log_level, None, args.failfast, args.n)
     for stats in r.run_files(args.testfiles):
         print(f'{r.version}\t{stats}')

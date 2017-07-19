@@ -4,23 +4,23 @@ import psycopg2.pool
 
 
 def db_args(parser):
-    parser.add_argument('--host', type=str, default='localhost')
-    parser.add_argument('--port', type=str, default='5432')
+    parser.add_argument('--dsn', default='crate://localhost:5432')
 
 
-def db_connection(host=None, port=None, dbname=None, args=None):
-    if args:
-        host = args.host
-        port = int(args.port)
-    else:
-        host = host or 'localhost'
-        port = port and int(port) or 5432
-    dbname = dbname or 'doc'
-    return psycopg2.connect(host=host, port=port, dbname=dbname)
+def split_dsn(dsn):
+    parts = dsn.split('://')
+    if len(parts) == 2:
+        return parts
+    return 'crate', dsn
+
+
+def db_connection(dsn):
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = True
+    return conn
 
 
 class ExThread(threading.Thread):
-
     def __init__(self, n, queue, conn):
         super().__init__(name=str(n), daemon=True)
         self.conn = conn
@@ -37,18 +37,17 @@ class ExThread(threading.Thread):
             cb(stmt, None)
             self.queue.task_done()
 
+
 class PoolExectuor:
-
-    def __init__(self, num_threads, **kwargs):
+    def __init__(self, num_threads, dsn):
         self.num_threads = num_threads
-        self.conn_args = kwargs
-        self.queue = queue.Queue(num_threads*5)
+        self.dsn = dsn
+        self.queue = queue.Queue(num_threads * 5)
         self._initThreads()
-
 
     def _initThreads(self):
         for i in range(self.num_threads):
-            t = ExThread(i, self.queue, db_connection(**self.conn_args))
+            t = ExThread(i, self.queue, db_connection(self.dsn))
             t.start()
 
     def execute(self, stmt, cb):
