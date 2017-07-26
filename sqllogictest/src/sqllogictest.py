@@ -26,10 +26,6 @@ QUERY_WHITELIST = [re.compile(o, re.IGNORECASE) for o in [
 ]]
 
 KNOWN_BUGS_EXCEPTIONS = [
-    'must appear in the GROUP BY clause or be used in an aggregation function',
-    'if type of default result argument ',
-    "Cannot GROUP BY 'NULL':",
-    "java.lang.Long cannot be cast to [Ljava.lang.Object;"
 ]
 
 varchar_to_string = partial(re.compile('VARCHAR\(\d+\)').sub, 'STRING')
@@ -83,10 +79,6 @@ class Statement(Command):
         except psycopg2.Error as e:
             if self.expect_ok:
                 raise e
-
-    def x__repr__(self):
-        return 'Statement<{0:.30}>'.format(self.query)
-
 
 def validate_hash(rows, formats, expected_values, hash_):
     values = len(rows)
