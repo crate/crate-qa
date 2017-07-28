@@ -10,7 +10,7 @@ This package requires Python installed with at least version 3.6.
 In order to run it sandboxed in the project directory do the following::
 
     python -m venv .venv
-    python -m ./venv/bin/pip install -e .
+    ./venv/bin/pip install -e .
 
 Run it:
 
