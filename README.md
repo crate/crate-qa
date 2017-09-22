@@ -14,15 +14,27 @@ git clone https://github.com/crate/crate-qa.git
 cd crate-qa
 ```
 
-Create virtualenv:
+Create virtualenv and install requirements:
 
 ```
 python3.6 -m venv env
 source env/bin/activate
-```
-
-Install requirements:
-
-```
 pip install -e .
+```
+
+## Test Suites
+
+Tests can be run by either changeing into the test directory and run `python -m
+unittest` or by executing the tests.py file directly with the Python
+interpreter.
+
+```
+cd tests/<dir>
+python -m unittest
+```
+
+or:
+
+```
+python tests/<dir>/tests.py
 ```
