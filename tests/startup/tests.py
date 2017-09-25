@@ -11,13 +11,11 @@ class StartupTest(NodeProvider, unittest.TestCase):
     fake = Faker()
 
     def test_name_settings(self):
-        print(f'# Starting: nightly')
-        self.settings = {
+        settings = {
             'node.name': self.fake.name(),
             'cluster.name': self.fake.name(),
         }
-        node = self._new_node('latest-nightly',
-                              settings=self.settings)
+        node = self._new_node('latest-nightly', settings=settings)
         node.start()
         with connect(node.http_url) as conn:
             cur = conn.cursor()
@@ -25,14 +23,14 @@ class StartupTest(NodeProvider, unittest.TestCase):
                 SELECT name FROM sys.cluster
             ''')
             res = cur.fetchone()
-            self.assertEqual(res[0], self.settings['cluster.name'])
+            self.assertEqual(res[0], settings['cluster.name'])
 
             print(res)
             cur.execute('''
                 SELECT name from sys.nodes
             ''')
             res = cur.fetchone()
-            self.assertEqual(res[0], self.settings['node.name'])
+            self.assertEqual(res[0], settings['node.name'])
 
 
 def test_suite():
