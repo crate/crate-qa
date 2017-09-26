@@ -18,8 +18,9 @@ class StartupTest(NodeProvider, unittest.TestCase):
     def test_name_settings(self):
         settings = {
             'node.name': self.fake.name(),
-            'cluster.name': self.fake.password(),
+            'cluster.name': self.fake.bothify(text='????.##'),
         }
+        print(f'# Running CrateDB {self.CRATE_VERSION} with settings: {settings}')
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url) as conn:
@@ -42,6 +43,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'path.logs': tempfile.mkdtemp(),
             'cluster.name': 'crate',
         }
+        print(f'# Running CrateDB {self.CRATE_VERSION} with settings: {settings}')
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url) as conn:
