@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 
+import os
 import unittest
 from crate.client import connect
 from crate.qa.tests import NodeProvider
 from faker import Faker
+from faker.config import AVAILABLE_LOCALES
+from faker.generator import random
 
 
 class StartupTest(NodeProvider, unittest.TestCase):
 
-    fake = Faker()
+    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
+    fake = Faker(random.choice(list(AVAILABLE_LOCALES)))
 
     def test_name_settings(self):
         settings = {
             'node.name': self.fake.name(),
-            'cluster.name': self.fake.name(),
+            'cluster.name': self.fake.password(),
         }
-        node = self._new_node('latest-nightly', settings=settings)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url) as conn:
             cur = conn.cursor()
@@ -25,7 +29,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
             res = cur.fetchone()
             self.assertEqual(res[0], settings['cluster.name'])
 
-            print(res)
             cur.execute('''
                 SELECT name from sys.nodes
             ''')
