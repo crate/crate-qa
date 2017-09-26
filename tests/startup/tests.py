@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import tempfile
 import unittest
 from crate.client import connect
 from crate.qa.tests import NodeProvider
@@ -34,6 +35,26 @@ class StartupTest(NodeProvider, unittest.TestCase):
             ''')
             res = cur.fetchone()
             self.assertEqual(res[0], settings['node.name'])
+
+    def test_path_settings(self):
+        settings = {
+            'path.data': tempfile.mkdtemp(),
+            'path.logs': tempfile.mkdtemp(),
+            'cluster.name': 'crate',
+        }
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        node.start()
+        with connect(node.http_url) as conn:
+            cur = conn.cursor()
+            cur.execute('''
+                SELECT fs['data']['path'] FROM sys.nodes
+            ''')
+            res = cur.fetchone()
+            self.assertTrue(res[0][0].startswith(node.data_path))
+        self.assertTrue(os.path.exists(
+            os.path.join(settings['path.logs'],
+                         settings['cluster.name'] + '.log')
+        ))
 
 
 def test_suite():
