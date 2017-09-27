@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+import os
 import shutil
 import tempfile
 import unittest
@@ -9,9 +8,17 @@ from cr8.run_crate import CrateNode, get_crate
 
 class NodeProvider:
 
+    def __init__(self, *args, **kwargs):
+        self.tmpdirs = []
+        super().__init__(*args, **kwargs)
+
+    def mkdtemp(self, *args):
+        tmp = tempfile.mkdtemp()
+        self.tmpdirs.append(tmp)
+        return os.path.join(tmp, *args)
+
     def setUp(self):
-        self._path_data = tempfile.mkdtemp()
-        print(f'data path: {self._path_data}')
+        self._path_data = self.mkdtemp()
         self._on_stop = []
 
         def new_node(version, settings={}):
@@ -20,6 +27,7 @@ class NodeProvider:
                 'cluster.name': 'crate-bwc-tests'
             })
             s.update(settings)
+            print(f'# Running CrateDB {version} with settings: {s}')
             n = CrateNode(
                 crate_dir=get_crate(version),
                 keep_data=True,
@@ -30,8 +38,9 @@ class NodeProvider:
         self._new_node = new_node
 
     def tearDown(self):
-        print(f'Removing: {self._path_data}')
-        shutil.rmtree(self._path_data, ignore_errors=True)
+        for tmp in self.tmpdirs:
+            print(f'# Removing temporary directory {tmp}')
+            shutil.rmtree(tmp, ignore_errors=True)
         self._process_on_stop()
 
     def _process_on_stop(self):

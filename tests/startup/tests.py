@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-
 import os
-import tempfile
-import unittest
 import socket
+import shutil
+import unittest
+from pathlib import Path
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import NodeProvider
@@ -26,7 +25,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'node.name': self.fake.name(),
             'cluster.name': self.fake.bothify(text='????.##'),
         }
-        print(f'# Running CrateDB {self.CRATE_VERSION} with settings: {settings}')
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url) as conn:
@@ -45,11 +43,10 @@ class StartupTest(NodeProvider, unittest.TestCase):
 
     def test_path_settings(self):
         settings = {
-            'path.data': tempfile.mkdtemp(),
-            'path.logs': tempfile.mkdtemp(),
+            'path.data': self.mkdtemp(),
+            'path.logs': self.mkdtemp(),
             'cluster.name': 'crate',
         }
-        print(f'# Running CrateDB {self.CRATE_VERSION} with settings: {settings}')
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url) as conn:
@@ -79,7 +76,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
                 'auth.host_based.config.0.protocol': 'http',
             })
 
-        print(f'# Running CrateDB {self.CRATE_VERSION} with settings: {settings}')
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
@@ -152,6 +148,34 @@ class StartupTest(NodeProvider, unittest.TestCase):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             result = s.connect_ex(('127.0.0.1', 1883))
             self.assertTrue(result > 0)
+
+    def test_read_crate_yml(self):
+        # Create CRATE_HOME directory
+        tmp_home = self.mkdtemp()
+        Path(tmp_home, 'config').mkdir()
+        # Write crate.yml
+        crate_yml = {
+            'node.name': self.fake.last_name(),
+        }
+        with Path(tmp_home, 'config', 'crate.yml').open('w') as fp:
+            for k, v in crate_yml.items():
+                fp.write(f'{k}: {v}\n')
+        # Copy log4j2.properties
+        shutil.copyfile(Path(Path(__file__).parent, 'log4j2.properties'),
+                        Path(tmp_home, 'config', 'log4j2.properties'))
+
+        settings = {
+            'path.home': tmp_home,
+        }
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        node.start()
+        with connect(node.http_url) as conn:
+            cur = conn.cursor()
+            cur.execute('''
+                SELECT name FROM sys.nodes
+            ''')
+            res = cur.fetchone()
+            self.assertTrue(res[0], crate_yml['node.name'])
 
 
 def test_suite():
