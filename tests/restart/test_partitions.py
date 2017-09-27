@@ -89,17 +89,3 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
             result = cursor.fetchone()
             self.assertEqual(result[0], 1)
             self.assertEqual(result[1], 'foo')
-
-
-def test_suite():
-    """
-    To be executed with `python -m unittest` from same directory as this file.
-    """
-    return unittest.makeSuite(PartitionTestCase)
-
-
-if __name__ == '__main__':
-    """
-    To be executed from anywhere using `python path/to/tests.py`.
-    """
-    unittest.main(verbosity=2)

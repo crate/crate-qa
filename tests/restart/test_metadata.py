@@ -117,17 +117,3 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             result = cursor.fetchone()
             expected = ['mqtt_table_rule', 'doc.mqtt_table', 'mqtt']
             self.assertEqual(result, expected)
-
-
-def test_suite():
-    """
-    To be executed with `python -m unittest` from same directory as this file.
-    """
-    return unittest.makeSuite(MetadataTestCase)
-
-
-if __name__ == '__main__':
-    """
-    To be executed from anywhere using `python path/to/tests.py`.
-    """
-    unittest.main(verbosity=2)

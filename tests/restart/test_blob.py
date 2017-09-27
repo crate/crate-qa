@@ -66,17 +66,3 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
             self.assertEqual(next(result), b'sample data')
             filepath = Path(self._path_data).glob(f'**/{digest}')
             self.assertTrue(next(filepath).exists())
-
-
-def test_suite():
-    """
-    To be executed with `python -m unittest` from same directory as this file.
-    """
-    return unittest.makeSuite(BlobTestCase)
-
-
-if __name__ == '__main__':
-    """
-    To be executed from anywhere using `python path/to/tests.py`.
-    """
-    unittest.main(verbosity=2)
