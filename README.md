@@ -26,3 +26,19 @@ Install requirements:
 ```
 pip install -e .
 ```
+
+## Usage
+
+Run all Test Cases (tests that are prefixed with `test_*.py`) inside `tests/restart/`
+
+```bash
+cd tests/restart/
+$ python3.6 -m unittest -v
+```
+
+Run a specific test method (e.g. `test_query_partitioned_table`)
+
+```bash
+$ python3.6 -m unittest -v test_partitions.PartitionTestCase.test_query_partitioned_table
+```
+
