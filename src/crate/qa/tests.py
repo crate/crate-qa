@@ -1,9 +1,30 @@
 import os
+import time
 import shutil
 import tempfile
-import time
+from typing import NamedTuple
 
 from cr8.run_crate import CrateNode, get_crate
+
+
+def wait_for_active_shards(cursor):
+    """Wait until all shards are started"""
+    waited = 0
+    duration = 0.01
+    while waited < 20:
+        cursor.execute(
+            "SELECT count(*) FROM sys.shards WHERE state != 'STARTED'")
+        if int(cursor.fetchone()[0]) == 0:
+            return
+        time.sleep(duration)
+        waited += duration
+        duration *= 2
+    raise TimeoutError("Shards didn't become active in time")
+
+
+class VersionDef(NamedTuple):
+    version: str
+    upgrade_segments: bool
 
 
 class NodeProvider:
@@ -47,17 +68,3 @@ class NodeProvider:
         for to_stop in self._on_stop:
             to_stop()
         self._on_stop.clear()
-
-    def _wait_for_active_shards(self, cursor):
-        """Wait until all shards are started"""
-        waited = 0
-        duration = 0.01
-        while waited < 20:
-            cursor.execute(
-                "SELECT count(*) FROM sys.shards WHERE state != 'STARTED'")
-            if int(cursor.fetchone()[0]) == 0:
-                return
-            time.sleep(duration)
-            waited += duration
-            duration *= 2
-        raise TimeoutError("Shards didn't become active in time")

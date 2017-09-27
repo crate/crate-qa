@@ -3,7 +3,7 @@ import http.client
 import json
 import os
 from crate.client import connect
-from crate.qa.tests import NodeProvider
+from crate.qa.tests import NodeProvider, wait_for_active_shards
 
 
 class PartitionTestCase(NodeProvider, unittest.TestCase):
@@ -83,7 +83,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
         node.start()
         with connect(node.http_url) as conn:
             cursor = conn.cursor()
-            self._wait_for_active_shards(cursor)
+            wait_for_active_shards(cursor)
             cursor.execute("""
             SELECT id, title FROM parted_table
             """)

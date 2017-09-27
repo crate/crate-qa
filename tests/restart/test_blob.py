@@ -5,7 +5,7 @@ import os
 from io import BytesIO
 from pathlib import Path
 from crate.client import connect
-from crate.qa.tests import NodeProvider
+from crate.qa.tests import NodeProvider, wait_for_active_shards
 
 
 class BlobTestCase(NodeProvider, unittest.TestCase):
@@ -27,7 +27,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
         node.start()
         with connect(node.http_url) as conn:
             cursor = conn.cursor()
-            self._wait_for_active_shards(cursor)
+            wait_for_active_shards(cursor)
             cursor.execute("""
             SELECT table_name, number_of_shards, number_of_replicas
             FROM information_schema.tables
@@ -56,7 +56,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
         node.start()
         with connect(node.http_url) as conn:
             cursor = conn.cursor()
-            self._wait_for_active_shards(cursor)
+            wait_for_active_shards(cursor)
             cursor.execute("SELECT count(*) FROM blob.myblobs WHERE digest = ?", (digest,))
             result = cursor.fetchone()
             self.assertEqual(result[0], 1)
