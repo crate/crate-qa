@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import unittest
+import os
 from io import BytesIO
 from pathlib import Path
 from crate.client import connect
@@ -9,7 +10,7 @@ from crate.qa.tests import NodeProvider
 
 class BlobTestCase(NodeProvider, unittest.TestCase):
 
-    CRATE_VERSION = 'latest-nightly'
+    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
 
     def test_blob_index(self):
         node = self._new_node(self.CRATE_VERSION)
