@@ -68,7 +68,19 @@ SELECT_STATEMENTS = (
     'SELECT * FROM t1',
     'SELECT * FROM t1 WHERE id = 1',
     'SELECT * FROM t1 WHERE col_ip > \'127.0.0.1\'',
-    'SELECT col_bool, count(*) FROM t1 GROUP BY col_bool',
+    'SELECT COUNT(DISTINCT col_byte),'
+    ' COUNT(DISTINCT col_short),'
+    ' COUNT(DISTINCT col_int),'
+    ' COUNT(DISTINCT col_long),'
+    ' COUNT(DISTINCT col_float),'
+    ' COUNT(DISTINCT col_double),'
+    ' COUNT(DISTINCT col_string),'
+    ' COUNT(DISTINCT col_ip),'
+    ' COUNT(DISTINCT col_timestamp)'
+    ' FROM t1',
+    'SELECT id, distance(col_geo_point, [0.0, 0.0]) FROM t1',
+    'SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)',
+    'SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1',
 )
 
 def dummy_generator():
