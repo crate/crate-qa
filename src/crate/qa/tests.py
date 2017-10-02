@@ -62,6 +62,7 @@ class NodeProvider:
         for tmp in self.tmpdirs:
             print(f'# Removing temporary directory {tmp}')
             shutil.rmtree(tmp, ignore_errors=True)
+        self.tmpdirs.clear()
         self._process_on_stop()
 
     def _process_on_stop(self):

@@ -20,6 +20,7 @@ VERSIONS = (
     VersionDef('2.0.x', False),
     VersionDef('2.1.x', False),
     VersionDef('2.2.x', False),
+    VersionDef('latest-nightly', False),
 )
 
 CREATE_DOC_TABLE = '''
@@ -123,15 +124,23 @@ def run_selects(c, blob_container, digest):
 
 class BwcTest(NodeProvider, unittest.TestCase):
 
-    def test_upgrade_from_054_to_latest(self):
-        """ Test upgrade path from 0.54 to latest
+    def test_upgrade_path(self):
+        for versions in [VERSIONS[x:] for x in range(len(VERSIONS) - 1)]:
+            try:
+                self.setUp()
+                self._test_upgrade_path(versions)
+            finally:
+                self.tearDown()
 
-        Creates a blob and regular table in 0.54 and inserts a record, then
-        goes through all VERSIONS - each time verifying that a few simple
-        selects work.
+    def _test_upgrade_path(self, versions):
+        """ Test upgrade path across specified versions.
+
+        Creates a blob and regular table in first version and inserts a record,
+        then goes through all subsequent versions - each time verifying that a
+        few simple selects work.
         """
-        version, _ = VERSIONS[0]
-        print(f'# Starting: {version}')
+        version, _ = versions[0]
+        print(f'# Test upgrade path from CrateDB version {version}')
         node = self._new_node(version)
         node.start()
         row = dummy_generator()
@@ -147,8 +156,7 @@ class BwcTest(NodeProvider, unittest.TestCase):
             run_selects(c, container, digest)
         self._process_on_stop()
 
-        for version, upgrade_segments in VERSIONS[1:]:
-            print(f'# Starting: {version}')
+        for version, upgrade_segments in versions[1:]:
             node = self._new_node(version)
             node.start()
             with connect(node.http_url) as conn:
