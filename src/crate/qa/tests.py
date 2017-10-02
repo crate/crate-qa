@@ -1,7 +1,9 @@
 import os
 import time
 import shutil
+import random
 import tempfile
+from threading import Thread
 from typing import NamedTuple
 
 from cr8.run_crate import CrateNode, get_crate
@@ -27,7 +29,26 @@ class VersionDef(NamedTuple):
     upgrade_segments: bool
 
 
+class CrateCluster:
+
+    def __init__(self, nodes=[]):
+        self._nodes = nodes
+
+    def start(self):
+        threads = []
+        for node in self._nodes:
+            t = Thread(target=node.start)
+            t.start()
+            threads.append(t)
+        [t.join() for t in threads]
+
+    def node(self):
+        return random.choice(self._nodes)
+
+
 class NodeProvider:
+
+    CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
 
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []
@@ -37,6 +58,30 @@ class NodeProvider:
         tmp = tempfile.mkdtemp()
         self.tmpdirs.append(tmp)
         return os.path.join(tmp, *args)
+
+    def _unicast_hosts(self, num, transport_port=4300):
+        return ','.join([
+            '127.0.0.1:{}'.format(str(transport_port + x))
+            for x in range(num)
+        ])
+
+    def _new_cluster(self, version, num_nodes, settings={}):
+        self.assertTrue(hasattr(self, '_new_node'))
+        for port in ['transport.tcp.port', 'http.port', 'psql.port']:
+            self.assertFalse(port in settings)
+        s = dict({
+            'cluster.name': 'crate-qa-cluster',
+            'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
+            'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
+            'gateway.recover_after_nodes': str(num_nodes),
+            'gateway.expected_nodes': str(num_nodes),
+            'node.max_local_storage_nodes': str(num_nodes),
+        })
+        s.update(settings)
+        nodes = []
+        for id in range(num_nodes):
+            nodes.append(self._new_node(version, s))
+        return CrateCluster(nodes)
 
     def setUp(self):
         self._path_data = self.mkdtemp()
@@ -48,11 +93,15 @@ class NodeProvider:
                 'cluster.name': 'crate-qa'
             })
             s.update(settings)
+            e = dict({
+                'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+            })
             print(f'# Running CrateDB {version} with settings: {s}')
             n = CrateNode(
                 crate_dir=get_crate(version),
                 keep_data=True,
                 settings=s,
+                env=e,
             )
             self._on_stop.append(n.stop)
             return n

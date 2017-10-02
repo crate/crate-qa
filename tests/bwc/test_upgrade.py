@@ -128,11 +128,11 @@ class BwcTest(NodeProvider, unittest.TestCase):
         for versions in [VERSIONS[x:] for x in range(len(VERSIONS) - 1)]:
             try:
                 self.setUp()
-                self._test_upgrade_path(versions)
+                self._test_upgrade_path(versions, nodes=3)
             finally:
                 self.tearDown()
 
-    def _test_upgrade_path(self, versions):
+    def _test_upgrade_path(self, versions, nodes):
         """ Test upgrade path across specified versions.
 
         Creates a blob and regular table in first version and inserts a record,
@@ -141,10 +141,10 @@ class BwcTest(NodeProvider, unittest.TestCase):
         """
         version, _ = versions[0]
         print(f'# Test upgrade path from CrateDB version {version}')
-        node = self._new_node(version)
-        node.start()
+        cluster = self._new_cluster(version, nodes)
+        cluster.start()
         row = dummy_generator()
-        with connect(node.http_url) as conn:
+        with connect(cluster.node().http_url) as conn:
             c = conn.cursor()
             c.execute(CREATE_DOC_TABLE)
             for x in range(10):
@@ -157,9 +157,9 @@ class BwcTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version, upgrade_segments in versions[1:]:
-            node = self._new_node(version)
-            node.start()
-            with connect(node.http_url) as conn:
+            cluster = self._new_cluster(version, nodes)
+            cluster.start()
+            with connect(cluster.node().http_url) as conn:
                 cursor = conn.cursor()
                 wait_for_active_shards(cursor)
                 if upgrade_segments:
