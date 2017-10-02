@@ -2,6 +2,7 @@ import unittest
 import http.client
 import json
 import os
+from datetime import datetime, timedelta
 from crate.client import connect
 from crate.qa.tests import NodeProvider, wait_for_active_shards
 
@@ -69,15 +70,16 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
             cursor.execute("""
             CREATE TABLE parted_table (
                 id long,
-                title string,
-                day timestamp
-            ) CLUSTERED BY (title) INTO 1 SHARDS PARTITIONED BY (day)
+                ts timestamp,
+                day__generated GENERATED ALWAYS AS date_trunc('day', ts)
+            ) CLUSTERED INTO 1 SHARDS PARTITIONED BY (day__generated)
             WITH (number_of_replicas = 0)
             """)
-            cursor.execute("""
-            INSERT INTO parted_table (id, title, day)
-            VALUES (?, ?, current_timestamp)
-            """, (1, 'foo'))
+            for x in range(5):
+                cursor.execute("""
+                INSERT INTO parted_table (id, ts)
+                VALUES (?, ?)
+                """, (x, datetime.now() - timedelta(days=x)))
         node.stop()
 
         node.start()
@@ -85,8 +87,8 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
             cursor = conn.cursor()
             wait_for_active_shards(cursor)
             cursor.execute("""
-            SELECT id, title FROM parted_table
+            SELECT id, date_trunc('day', ts) = day__generated FROM parted_table
             """)
-            result = cursor.fetchone()
-            self.assertEqual(result[0], 1)
-            self.assertEqual(result[1], 'foo')
+            for idx, result in enumerate(cursor.fetchall()):
+                self.assertEqual(result[0], idx)
+                self.assertTrue(result[1])
