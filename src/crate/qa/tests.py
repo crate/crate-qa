@@ -48,6 +48,7 @@ class CrateCluster:
 
 class NodeProvider:
 
+    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
 
     def __init__(self, *args, **kwargs):

@@ -11,7 +11,6 @@ from faker.generator import random
 
 class StartupTest(NodeProvider, unittest.TestCase):
 
-    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     fake = Faker(random.choice(list(AVAILABLE_LOCALES)))
 
     def test_read_crate_yml(self):

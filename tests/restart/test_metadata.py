@@ -7,7 +7,6 @@ from crate.qa.tests import NodeProvider
 
 class MetadataTestCase(NodeProvider, unittest.TestCase):
 
-    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     CRATE_SETTINGS = {
         'license.enterprise': True,
         'lang.js.enabled': True

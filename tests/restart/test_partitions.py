@@ -9,7 +9,6 @@ from crate.qa.tests import NodeProvider, wait_for_active_shards
 
 class PartitionTestCase(NodeProvider, unittest.TestCase):
 
-    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     CRATE_SETTINGS = {
         'es.api.enabled': True
     }
