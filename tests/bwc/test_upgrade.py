@@ -126,11 +126,9 @@ class BwcTest(NodeProvider, unittest.TestCase):
 
     def test_upgrade_path(self):
         for versions in [VERSIONS[x:] for x in range(len(VERSIONS) - 1)]:
-            try:
-                self.setUp()
+            version, _ = versions[0]
+            with self.subTest(f'{version} -> latest'):
                 self._test_upgrade_path(versions, nodes=3)
-            finally:
-                self.tearDown()
 
     def _test_upgrade_path(self, versions, nodes):
         """ Test upgrade path across specified versions.
