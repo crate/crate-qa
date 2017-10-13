@@ -116,9 +116,7 @@ def dummy_generator():
 
 def run_selects(c, blob_container, digest):
     for stmt in SELECT_STATEMENTS:
-        print('  ', stmt)
         c.execute(stmt)
-    print('   Getting blob: ', digest)
     blob_container.get(digest)
 
 
@@ -128,7 +126,11 @@ class BwcTest(NodeProvider, unittest.TestCase):
         for versions in [VERSIONS[x:] for x in range(len(VERSIONS) - 1)]:
             version, _ = versions[0]
             with self.subTest(f'{version} -> latest'):
-                self._test_upgrade_path(versions, nodes=3)
+                try:
+                    self.setUp()
+                    self._test_upgrade_path(versions, nodes=3)
+                finally:
+                    self.tearDown()
 
     def _test_upgrade_path(self, versions, nodes):
         """ Test upgrade path across specified versions.

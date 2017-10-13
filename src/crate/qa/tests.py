@@ -3,6 +3,7 @@ import time
 import shutil
 import random
 import tempfile
+from pprint import pformat
 from threading import Thread
 from typing import NamedTuple
 
@@ -50,6 +51,7 @@ class NodeProvider:
 
     CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
+    DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []
@@ -62,7 +64,7 @@ class NodeProvider:
 
     def _unicast_hosts(self, num, transport_port=4300):
         return ','.join([
-            '127.0.0.1:{}'.format(str(transport_port + x))
+            '127.0.0.1:' + str(transport_port + x)
             for x in range(num)
         ])
 
@@ -70,14 +72,14 @@ class NodeProvider:
         self.assertTrue(hasattr(self, '_new_node'))
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
             self.assertFalse(port in settings)
-        s = dict({
+        s = {
             'cluster.name': 'crate-qa-cluster',
             'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
             'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
             'gateway.recover_after_nodes': str(num_nodes),
             'gateway.expected_nodes': str(num_nodes),
             'node.max_local_storage_nodes': str(num_nodes),
-        })
+        }
         s.update(settings)
         nodes = []
         for id in range(num_nodes):
@@ -89,15 +91,22 @@ class NodeProvider:
         self._on_stop = []
 
         def new_node(version, settings={}):
-            s = dict({
+            s = {
                 'path.data': self._path_data,
                 'cluster.name': 'crate-qa'
-            })
+            }
             s.update(settings)
-            e = dict({
+            e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
-            })
-            print(f'# Running CrateDB {version} with settings: {s}')
+            }
+
+            print(f'# Running CrateDB {version} ...')
+            if self.DEBUG:
+                s_nice = pformat(s)
+                print(f'with settings: {s_nice}')
+                e_nice = pformat(e)
+                print(f'with environment: {e_nice}')
+
             n = CrateNode(
                 crate_dir=get_crate(version),
                 keep_data=True,
