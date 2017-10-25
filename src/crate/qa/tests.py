@@ -1,13 +1,50 @@
 import os
 import time
+import math
 import shutil
-import random
+import operator
 import tempfile
 from pprint import pformat
 from threading import Thread
 from typing import NamedTuple
-
+from functools import partial
+from collections import OrderedDict
+from distutils.version import StrictVersion as V
+from faker import Faker
+from faker.generator import random
+from faker.providers import BaseProvider
 from cr8.run_crate import CrateNode, get_crate
+from cr8.insert_fake_data import DataFaker, generate_row, SELLECT_COLS
+from cr8.insert_json import to_insert
+
+CRATEDB_0_57 = V('0.57.0')
+
+
+def fake_generator(columns):
+    fake = ExtDataFaker()
+    fakers = []
+    for column_name, column_type in columns.items():
+        fakers.append(fake.provider_for_column(column_name, column_type))
+    return partial(generate_row, fakers)
+
+
+def columns_for_table(conn, schema, table):
+    c = conn.cursor()
+    c.execute("SELECT min(version['number']) FROM sys.nodes")
+    version = V(c.fetchone()[0])
+    stmt = SELLECT_COLS.format(
+        schema_column_name='table_schema' if version >= CRATEDB_0_57 else 'schema_name')
+    c.execute(stmt, (schema, table, ))
+    return OrderedDict(c.fetchall())
+
+
+def insert_data(conn, schema, table, num_rows):
+    cols = columns_for_table(conn, schema, table)
+    stmt, args = to_insert(f'"{schema}"."{table}"', cols)
+    row = fake_generator(cols)
+    c = conn.cursor()
+    c.executemany(stmt, [row() for x in range(num_rows)])
+    c.execute(f'REFRESH TABLE "{schema}"."{table}"')
 
 
 def wait_for_active_shards(cursor):
@@ -23,6 +60,68 @@ def wait_for_active_shards(cursor):
         waited += duration
         duration *= 2
     raise TimeoutError("Shards didn't become active in time")
+
+
+class GeoShapeProvider(BaseProvider):
+    """
+    This class can be removed once the GeoSpatialProvider of the cr8 package
+    provide the geo_shape() method.
+    """
+
+    EARTH_RADIUS = 6371.0  # in km
+
+    def geo_shape(self, sides=5, center=None, distance=None):
+        assert isinstance(sides, int)
+
+        if center is None:
+            u = self.generator.random.uniform
+            center = [
+                u(-180.0, 180.0),
+                u(-90.0, 90.0)
+            ]
+        else:
+            assert -180.0 <= center[0] <= 180.0
+            assert -90.0 <= center[1] <= 90.0
+
+        if distance is None:
+            distance = self.random_int(100, 1000)
+        else:
+            # 6371 => earth radius in km
+            # assert that shape radius is maximum half of earth's circumference
+            assert isinstance(distance, int)
+            assert distance <= self.EARTH_RADIUS * math.pi
+
+        d_arc = distance * 180.0 / self.EARTH_RADIUS / math.pi
+
+        points = []
+        angles = self.random_sample(range(360), sides)
+        angles.sort()
+        for a in angles:
+            rad = a * math.pi / 180.0
+            points.append(
+                [center[0] + d_arc * math.sin(rad),
+                 center[1] + d_arc * math.cos(rad)]
+            )
+        # close polygon
+        points.append(points[0])
+
+        path = ', '.join([' '.join(p) for p in ([str(lon), str(lat)] for lon, lat in points)])
+        return f'POLYGON (( {path} ))'
+
+
+class ExtDataFaker(DataFaker):
+    """
+    This class can be removed once the GeoSpatialProvider of the cr8 package
+    provide the geo_shape() method.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.fake.add_provider(GeoShapeProvider)
+        self._type_default.update({
+            'geo_shape': operator.attrgetter('geo_shape'),
+            'byte': lambda f: partial(f.random_int, min=-128, max=127),
+        })
 
 
 class VersionDef(NamedTuple):

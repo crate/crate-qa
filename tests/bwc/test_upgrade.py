@@ -3,12 +3,9 @@ import time
 import unittest
 from io import BytesIO
 from crate.client import connect
-from crate.qa.tests import VersionDef, NodeProvider, wait_for_active_shards
-from faker import Faker
-from faker.generator import random
-
-
-fake = Faker()
+from crate.qa.tests import (
+    VersionDef, NodeProvider, wait_for_active_shards, insert_data
+)
 
 VERSIONS = (
     VersionDef('0.54.x', False),
@@ -46,24 +43,6 @@ CREATE BLOB TABLE b1
 CLUSTERED INTO 2 SHARDS WITH (number_of_replicas = 0)
 '''
 
-INSERT = '''
-INSERT INTO t1 (
-    id,
-    col_bool,
-    col_byte,
-    col_short,
-    col_int,
-    col_long,
-    col_float,
-    col_double,
-    col_string,
-    col_geo_point,
-    col_geo_shape,
-    col_ip,
-    col_timestamp
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-'''
-
 # Use statements that use different code paths to retrieve the values
 SELECT_STATEMENTS = (
     'SELECT * FROM t1',
@@ -83,36 +62,6 @@ SELECT_STATEMENTS = (
     'SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)',
     'SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1',
 )
-
-def dummy_generator():
-    id = 0
-    while True:
-        id += 1
-        yield (
-            id,
-            random.getrandbits(1) and True or False,
-            random.randint(-2**7, 2**7 - 1),
-            random.randint(-2**15, 2**15 - 1),
-            random.randint(-2**31, 2**31 - 1),
-            random.randint(-2**63, 2**63 - 1),
-            random.random(),
-            random.random(),
-            fake.name(),
-            [random.uniform(-180, 180), random.uniform(-90, 90)],
-            'POLYGON (( {0} {1}, {2} {3}, {4} {5}, {6} {7}, {0} {1}))'.format(
-                random.uniform(-90, 0),
-                random.uniform(-45, 0),
-                random.uniform(0, 90),
-                random.uniform(-45, 0),
-                random.uniform(0, 90),
-                random.uniform(0, 45),
-                random.uniform(-90, 0),
-                random.uniform(45, 0),
-            ),
-            fake.ipv4(),
-            fake.date_this_decade()
-        )
-
 
 def run_selects(c, blob_container, digest):
     for stmt in SELECT_STATEMENTS:
@@ -143,13 +92,10 @@ class BwcTest(NodeProvider, unittest.TestCase):
         print(f'# Test upgrade path from CrateDB version {version}')
         cluster = self._new_cluster(version, nodes)
         cluster.start()
-        row = dummy_generator()
         with connect(cluster.node().http_url) as conn:
             c = conn.cursor()
             c.execute(CREATE_DOC_TABLE)
-            for x in range(10):
-                c.execute(INSERT, next(row))
-            c.execute('REFRESH TABLE t1')
+            insert_data(conn, 'doc', 't1', 10)
             c.execute(CREATE_BLOB_TABLE)
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
