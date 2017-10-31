@@ -118,9 +118,13 @@ class GeoShapeProvider(BaseProvider):
                 'distance must not be greater than half of earth\'s circumference'
 
         if center is None:
+            u = self.generator.random.uniform
             # required minimal spherical distance from north/southpole
             dp = distance * 180.0 / EARTH_RADIUS / math.pi
-            center = self.geo_point(lat_min=-90.0 + dp, lat_max=90.0 - dp)
+            center = [
+                u(-180.0, 180.0),
+                u(-90.0 + dp, 90.0 - dp)
+            ]
         else:
             assert -180.0 <= center[0] <= 180.0, 'Longitude out of bounds'
             assert -90.0 <= center[1] <= 90.0, 'Latitude out of bounds'
