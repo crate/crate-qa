@@ -1,5 +1,3 @@
-import os
-import time
 import unittest
 from io import BytesIO
 from crate.client import connect
@@ -45,7 +43,7 @@ CLUSTERED INTO 2 SHARDS WITH (number_of_replicas = 0)
 
 # Use statements that use different code paths to retrieve the values
 SELECT_STATEMENTS = (
-    'SELECT * FROM t1',
+    'SELECT _id, _uid, * FROM t1',
     'SELECT * FROM t1 WHERE id = 1',
     'SELECT * FROM t1 WHERE col_ip > \'127.0.0.1\'',
     'SELECT COUNT(DISTINCT col_byte),'
@@ -62,6 +60,7 @@ SELECT_STATEMENTS = (
     'SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)',
     'SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1',
 )
+
 
 def run_selects(c, blob_container, digest):
     for stmt in SELECT_STATEMENTS:

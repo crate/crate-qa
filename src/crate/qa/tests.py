@@ -10,7 +10,6 @@ from typing import NamedTuple
 from functools import partial
 from collections import OrderedDict
 from distutils.version import StrictVersion as V
-from faker import Faker
 from faker.generator import random
 from faker.providers import BaseProvider
 from cr8.run_crate import CrateNode, get_crate
