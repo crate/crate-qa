@@ -28,8 +28,7 @@ setup(
         'console_scripts': []
     },
     package_dir={'': 'src'},
-    packages=find_packages('src'),
-    namespace_packages=['crate'],
+    packages=['crate.qa'],
     install_requires=requirements().split('\n'),
     python_requires='>=3.6',
     classifiers=[
