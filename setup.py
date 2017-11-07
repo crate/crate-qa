@@ -14,7 +14,6 @@ def read(filename):
 
 
 readme = functools.partial(read, 'README.rst')
-requirements = functools.partial(read, 'requirements.txt')
 
 
 setup(
@@ -29,7 +28,12 @@ setup(
     },
     package_dir={'': 'src'},
     packages=['crate.qa'],
-    install_requires=requirements().split('\n'),
+    install_requires=[
+        'cr8==0.12-master',
+    ],
+    dependency_links=[
+        'git+https://github.com/mfussenegger/cr8.git@master#egg=cr8-0.12-master',
+    ],
     python_requires='>=3.6',
     classifiers=[
         'Development Status :: 4 - Beta',
