@@ -1,7 +1,6 @@
 import unittest
 import http.client
 import json
-import os
 from datetime import datetime, timedelta
 from crate.client import connect
 from crate.qa.tests import NodeProvider, wait_for_active_shards

@@ -33,12 +33,12 @@ CREATE TABLE t1 (
     col_geo_shape GEO_SHAPE,
     col_ip IP,
     col_timestamp TIMESTAMP
-) CLUSTERED INTO 2 SHARDS WITH (number_of_replicas = 0)
+) CLUSTERED INTO 3 SHARDS WITH (number_of_replicas = 0)
 '''
 
 CREATE_BLOB_TABLE = '''
 CREATE BLOB TABLE b1
-CLUSTERED INTO 2 SHARDS WITH (number_of_replicas = 0)
+CLUSTERED INTO 3 SHARDS WITH (number_of_replicas = 0)
 '''
 
 # Use statements that use different code paths to retrieve the values

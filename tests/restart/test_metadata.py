@@ -96,7 +96,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
                 client_id int PRIMARY KEY,
                 topic string,
                 payload object(ignored)
-            )
+            ) WITH (number_of_replicas=0)
             """)
             cursor.execute("""
             CREATE INGEST RULE mqtt_table_rule

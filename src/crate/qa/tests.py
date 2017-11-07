@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import math
 import shutil
@@ -16,6 +17,7 @@ from cr8.run_crate import CrateNode, get_crate
 from cr8.insert_fake_data import DataFaker, generate_row, SELLECT_COLS
 from cr8.insert_json import to_insert
 
+DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
 EARTH_RADIUS = 6371  # earth radius in km
 
@@ -47,7 +49,7 @@ def insert_data(conn, schema, table, num_rows):
     c.execute(f'REFRESH TABLE "{schema}"."{table}"')
 
 
-def wait_for_active_shards(cursor, num_active=0):
+def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
     """Wait for shards to become active
 
     If `num_active` is `0` this will wait until there are no shards that aren't
@@ -56,8 +58,8 @@ def wait_for_active_shards(cursor, num_active=0):
     the state `STARTED`
     """
     waited = 0
-    duration = 0.01
-    while waited < 20:
+    duration = 0.1
+    while waited < timeout:
         if num_active > 0:
             cursor.execute(
                 "SELECT count(*) FROM sys.shards where state = 'STARTED'")
@@ -70,8 +72,17 @@ def wait_for_active_shards(cursor, num_active=0):
                 return
         time.sleep(duration)
         waited += duration
-        duration *= 2
-    raise TimeoutError("Shards didn't become active in time")
+        duration *= f
+
+    if DEBUG:
+        print('-' * 79)
+        print(f'waited: {waited} last duration: {duration} timeout: {timeout}')
+        cursor = conn.cursor()
+        cursor.execute('SELECT count(*), table_name, state FROM sys.shards GROUP BY 2, 3 ORDER BY 2')
+        rs = cursor.fetchall()
+        print(f'=== {rs}')
+        print('-' * 79)
+    raise TimeoutError(f"Shards didn't become active within {timeout}s.")
 
 
 def _dest_point(point, distance, bearing, radius):
