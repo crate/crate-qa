@@ -13,15 +13,15 @@ def randbool():
     return True if random.getrandbits(1) else False
 
 
-def test_mqtt_port(predicate):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        result = s.connect_ex(('127.0.0.1', 1883))
-        self.assertTrue(predicate(result))
-
 
 class StartupTest(NodeProvider, unittest.TestCase):
 
     fake = Faker(random.choice(list(AVAILABLE_LOCALES)))
+
+    def assert_mqtt_port(self, predicate):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            result = s.connect_ex(('127.0.0.1', 1883))
+            self.assertTrue(predicate(result))
 
     def test_name_settings(self):
         settings = {
@@ -120,9 +120,9 @@ class StartupTest(NodeProvider, unittest.TestCase):
 
             # MQTT
             if settings['ingestion.mqtt.enabled']:
-                test_mqtt_port(lambda x: x == 0)
+                self.assert_mqtt_port(lambda x: x == 0)
 
-    def test_enterprise_disabled(self, settings, conn):
+    def test_enterprise_disabled(self):
         settings = dict({
             'license.enterprise': False,
         })
@@ -150,4 +150,4 @@ class StartupTest(NodeProvider, unittest.TestCase):
                     AS 'function js_add(a, b) { return a + b; }'
                 ''')
             # MQTT
-            test_mqtt_port(lambda x: x > 0)
+            self.assert_mqtt_port(lambda x: x > 0)
