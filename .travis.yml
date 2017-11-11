@@ -9,8 +9,10 @@ before_install:
 
 install:
     - pip install --upgrade --process-dependency-links -e .
+    - pip install crash
 
 script:
+    - tests/client_tests/go/run.sh
     - cd tests && python -m unittest -vf
 
 env:
@@ -24,3 +26,4 @@ addons:
   apt:
     packages:
       - oracle-java8-set-default
+      - dh-golang
