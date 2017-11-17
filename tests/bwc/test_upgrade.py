@@ -106,7 +106,7 @@ class BwcTest(NodeProvider, unittest.TestCase):
             cluster.start()
             with connect(cluster.node().http_url) as conn:
                 cursor = conn.cursor()
-                wait_for_active_shards(cursor)
+                wait_for_active_shards(cursor, 4)
                 cursor.execute('ALTER TABLE doc.t1 SET ("number_of_replicas" = 1)')
                 if upgrade_segments:
                     cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')

@@ -47,15 +47,27 @@ def insert_data(conn, schema, table, num_rows):
     c.execute(f'REFRESH TABLE "{schema}"."{table}"')
 
 
-def wait_for_active_shards(cursor):
-    """Wait until all shards are started"""
+def wait_for_active_shards(cursor, num_active=0):
+    """Wait for shards to become active
+
+    If `num_active` is `0` this will wait until there are no shards that aren't
+    started.
+    If `num_active > 0` this will wait until there are `num_active` shards with
+    the state `STARTED`
+    """
     waited = 0
     duration = 0.01
     while waited < 20:
-        cursor.execute(
-            "SELECT count(*) FROM sys.shards WHERE state != 'STARTED'")
-        if int(cursor.fetchone()[0]) == 0:
-            return
+        if num_active > 0:
+            cursor.execute(
+                "SELECT count(*) FROM sys.shards where state = 'STARTED'")
+            if int(cursor.fetchone()[0]) == num_active:
+                return
+        else:
+            cursor.execute(
+                "SELECT count(*) FROM sys.shards WHERE state != 'STARTED'")
+            if int(cursor.fetchone()[0]) == 0:
+                return
         time.sleep(duration)
         waited += duration
         duration *= 2
