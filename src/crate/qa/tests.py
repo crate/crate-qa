@@ -1,9 +1,10 @@
-import os
-import time
+import json
 import math
-import shutil
 import operator
+import os
+import shutil
 import tempfile
+import time
 from pprint import pformat
 from threading import Thread
 from typing import NamedTuple
@@ -18,6 +19,7 @@ from cr8.insert_json import to_insert
 
 CRATEDB_0_57 = V('0.57.0')
 EARTH_RADIUS = 6371  # earth radius in km
+DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
 
 def fake_generator(columns):
@@ -71,7 +73,14 @@ def wait_for_active_shards(cursor, num_active=0):
         time.sleep(duration)
         waited += duration
         duration *= 2
-    raise TimeoutError("Shards didn't become active in time")
+    if DEBUG:
+        print('TIMEOUT')
+        import pdb
+        pdb.set_trace()
+    cursor.execute(
+        "select schema_name, table_name, id, state, primary from sys.shards order by 1, 2, 3, 5")
+    rows = cursor.fetchall()
+    raise TimeoutError("Shards didn't become active in time\n" + json.dumps(rows))
 
 
 def _dest_point(point, distance, bearing, radius):
@@ -191,7 +200,6 @@ class NodeProvider:
 
     CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
     CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
-    DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []
@@ -218,6 +226,7 @@ class NodeProvider:
             'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
             'gateway.recover_after_nodes': str(num_nodes),
             'gateway.expected_nodes': str(num_nodes),
+            'es.api.enabled': True,
             'node.max_local_storage_nodes': str(num_nodes),
         }
         s.update(settings)
@@ -241,7 +250,7 @@ class NodeProvider:
             }
 
             print(f'# Running CrateDB {version} ...')
-            if self.DEBUG:
+            if DEBUG:
                 s_nice = pformat(s)
                 print(f'with settings: {s_nice}')
                 e_nice = pformat(e)

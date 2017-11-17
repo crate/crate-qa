@@ -114,4 +114,5 @@ class BwcTest(NodeProvider, unittest.TestCase):
                 blobs = conn.get_blob_container('b1')
                 run_selects(cursor, blobs, digest)
                 cursor.execute('ALTER TABLE doc.t1 SET ("number_of_replicas" = 0)')
+                wait_for_active_shards(cursor, 4)
             self._process_on_stop()

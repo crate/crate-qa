@@ -1,0 +1,28 @@
+language: python
+cache: pip
+python:
+    - 3.6
+    - nightly
+
+before_install:
+    - pip install --upgrade setuptools
+    - pip uninstall -y six
+
+install:
+    - pip install --upgrade -e .
+
+script:
+    - cd tests && python -m unittest -vvv
+
+notifications:
+    email: false
+
+sudo: false
+addons:
+  apt:
+    packages:
+      - oracle-java8-set-default
+
+matrix:
+    allow_failures:
+        - python: nightly
