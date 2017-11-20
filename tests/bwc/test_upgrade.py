@@ -107,11 +107,11 @@ class BwcTest(NodeProvider, unittest.TestCase):
             with connect(cluster.node().http_url) as conn:
                 cursor = conn.cursor()
                 wait_for_active_shards(cursor, 4)
-                cursor.execute('ALTER TABLE doc.t1 SET ("number_of_replicas" = 1)')
                 if upgrade_segments:
                     cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')
                     cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
+                cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
                 blobs = conn.get_blob_container('b1')
                 run_selects(cursor, blobs, digest)
-                cursor.execute('ALTER TABLE doc.t1 SET ("number_of_replicas" = 0)')
+                cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
             self._process_on_stop()
