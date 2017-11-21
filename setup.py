@@ -30,6 +30,8 @@ setup(
     packages=['crate.qa'],
     install_requires=[
         'cr8==0.12-master',
+        'Cython',
+        'asyncpg'
     ],
     dependency_links=[
         'git+https://github.com/mfussenegger/cr8.git@master#egg=cr8-0.12-master',
