@@ -15,7 +15,8 @@ class AsyncpgTestCase(NodeProvider, unittest.TestCase):
         async def run(hosts, future):
             pool = await asyncpg.create_pool(f'postgres://crate@{hosts}/doc')
             async with pool.acquire() as conn:
-                create_result = await conn.execute("CREATE TABLE t1 (x int)")
+                create_result = await conn.execute("CREATE TABLE t1 (x int \
+                        primary key)")
                 if int(create_result[7]) != 1:
                     future.set_exception(AssertionError("CREATE statement \
 should've returned count 1 but the result was: " + create_result))
@@ -44,6 +45,20 @@ should've returned count 1 but the result was: " + refresh_result))
                 if int(delete_result[7]) != 1:
                     future.set_exception(AssertionError("DELETE statement \
 should've returned count 1 but the result was: " + delete_result))
+
+                insert_from_subquery_result = await conn.execute('INSERT INTO \
+                        t1 (x) (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)', 1)
+                if int(insert_from_subquery_result[9]) != 1:
+                    future.set_exception(AssertionError("INSERT FROM SUBQUERY \
+should've returned count 1 but the result was: " + insert_from_subquery_result))
+
+                insert_subquery_on_duplicate = await conn.execute('INSERT INTO \
+                        t1 (x) (SELECT col1 FROM unnest([1, 2]) \
+                        WHERE col1 = ?) ON DUPLICATE KEY UPDATE x = ?', 1, 2)
+                if int(insert_subquery_on_duplicate[9]) != 1:
+                    future.set_exception(AssertionError("INSERT FROM SUBQUERY \
+with ON DUPLICATE KEY clause should've returned count 1 but the result was:\
+" + insert_subquery_on_duplicate))
 
                 if not future.done():
                     future.set_result("Success!")
