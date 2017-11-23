@@ -16,7 +16,7 @@ class AsyncpgTestCase(NodeProvider, unittest.TestCase):
             pool = await asyncpg.create_pool(f'postgres://crate@{hosts}/doc')
             async with pool.acquire() as conn:
                 create_result = await conn.execute("CREATE TABLE t1 (x int \
-                        primary key)")
+                        primary key, y int)")
                 if int(create_result[7]) != 1:
                     future.set_exception(AssertionError("CREATE statement \
 should've returned count 1 but the result was: " + create_result))
@@ -31,7 +31,7 @@ should've returned count 1 but the result was: " + insert_result))
                     future.set_exception(AssertionError("REFRESH statement \
 should've returned count 1 but the result was: " + refresh_result))
 
-                update_result = await conn.execute('UPDATE t1 SET x = ?', 2)
+                update_result = await conn.execute('UPDATE t1 SET y = ?', 2)
                 if int(update_result[7]) != 1:
                     future.set_exception(AssertionError("UPDATE statement \
 should've returned count 1 but the result was: " + update_result))
@@ -41,7 +41,7 @@ should've returned count 1 but the result was: " + update_result))
                     future.set_exception(AssertionError("REFRESH statement \
 should've returned count 1 but the result was: " + refresh_result))
 
-                delete_result = await conn.execute('DELETE FROM t1 WHERE x = ?', 2)
+                delete_result = await conn.execute('DELETE FROM t1 WHERE y = ?', 2)
                 if int(delete_result[7]) != 1:
                     future.set_exception(AssertionError("DELETE statement \
 should've returned count 1 but the result was: " + delete_result))
