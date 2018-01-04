@@ -55,7 +55,7 @@ should've returned count 1 but the result was: " + insert_from_subquery_result))
 
                     insert_subquery_on_duplicate = await conn.execute('INSERT INTO \
                             t1 (x) (SELECT col1 FROM unnest([1, 2]) \
-                            WHERE col1 = ?) ON DUPLICATE KEY UPDATE x = ?', 1, 2)
+                            WHERE col1 = ?) ON DUPLICATE KEY UPDATE y = ?', 1, 2)
                     if int(insert_subquery_on_duplicate[9]) != 1:
                         future.set_exception(AssertionError("INSERT FROM SUBQUERY \
 with ON DUPLICATE KEY clause should've returned count 1 but the result was:\
