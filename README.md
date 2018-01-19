@@ -19,7 +19,7 @@ Create virtualenv and install requirements:
 ```
 python3.6 -m venv env
 source env/bin/activate
-pip install -e .
+pip install --upgrade --process-dependency-links -e .
 ```
 
 ## Test Suites
