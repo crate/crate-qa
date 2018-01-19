@@ -1,21 +1,29 @@
 import unittest
 from io import BytesIO
 from crate.client import connect
-from crate.qa.tests import (
-    VersionDef, NodeProvider, wait_for_active_shards, insert_data
-)
+from crate.qa.tests import VersionDef, NodeProvider, \
+    wait_for_active_shards, insert_data
 
-VERSIONS = (
-    VersionDef('0.54.x', False),
-    VersionDef('0.55.x', False),
-    VersionDef('0.56.x', False),
-    VersionDef('0.57.x', False),
-    VersionDef('1.0.x', False),
-    VersionDef('1.1.x', True),
-    VersionDef('2.0.x', False),
-    VersionDef('2.1.x', False),
-    VersionDef('2.2.x', False),
-    VersionDef('latest-nightly', False),
+UPGRADE_PATHS = (
+    (
+        VersionDef('0.54.x', False),
+        VersionDef('0.55.x', False),
+        VersionDef('0.56.x', False),
+        VersionDef('0.57.x', False),
+        VersionDef('1.0.x', False),
+        VersionDef('1.1.x', True),
+        VersionDef('2.0.x', False),
+        VersionDef('2.1.x', False),
+        VersionDef('2.2.x', False),
+        VersionDef('2.3.x', False),
+    ),
+    (
+        VersionDef('2.0.x', False),
+        VersionDef('2.1.x', False),
+        VersionDef('2.2.x', False),
+        VersionDef('2.3.x', True),
+        VersionDef('latest-nightly', False),
+    )
 )
 
 CREATE_DOC_TABLE = '''
@@ -68,15 +76,33 @@ def run_selects(c, blob_container, digest):
     blob_container.get(digest)
 
 
+def get_test_paths():
+    """
+    Generater for all possible upgrade paths that should be tested.
+    """
+    for path in UPGRADE_PATHS:
+        for versions in (path[x:] for x in range(len(path) - 1)):
+            yield versions
+
+
+def path_repr(path):
+    """
+    String representation of the upgrade path in the format::
+
+        from_version -> to_version
+    """
+    versions = [v for v,_ in path]
+    return f'{versions[0]} -> {versions[-1]}'
+
+
 class BwcTest(NodeProvider, unittest.TestCase):
 
-    def test_upgrade_path(self):
-        for versions in [VERSIONS[x:] for x in range(len(VERSIONS) - 1)]:
-            version, _ = versions[0]
-            with self.subTest(f'{version} -> latest'):
+    def test_upgrade_paths(self):
+        for path in get_test_paths():
+            with self.subTest(path_repr(path)):
                 try:
                     self.setUp()
-                    self._test_upgrade_path(versions, nodes=3)
+                    self._test_upgrade_path(path, nodes=3)
                 finally:
                     self.tearDown()
 
@@ -87,9 +113,7 @@ class BwcTest(NodeProvider, unittest.TestCase):
         then goes through all subsequent versions - each time verifying that a
         few simple selects work.
         """
-        version, _ = versions[0]
-        print(f'# Test upgrade path from CrateDB version {version}')
-        cluster = self._new_cluster(version, nodes)
+        cluster = self._new_cluster(versions[0][0], nodes)
         cluster.start()
         with connect(cluster.node().http_url) as conn:
             c = conn.cursor()
