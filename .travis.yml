@@ -13,10 +13,10 @@ install:
 
 script:
     - tests/client_tests/go/run.sh
-    - cd tests && python -m unittest -vf
+    - cd tests && python -m unittest -vvvf
 
 env:
-  - DEBUG=true
+  - DEBUG=false
 
 notifications:
     email: false
