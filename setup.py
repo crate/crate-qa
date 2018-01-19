@@ -28,6 +28,7 @@ setup(
     },
     package_dir={'': 'src'},
     packages=['crate.qa'],
+    namespace_packages=['crate'],
     install_requires=[
         'cr8==0.12-master',
         'Cython',
