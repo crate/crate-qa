@@ -13,7 +13,7 @@ install:
 
 script:
     - tests/client_tests/go/run.sh
-    - cd tests && python -m unittest -vvvf
+    - cd tests && python -m unittest -vvv $(find . -name "test_*.py" | grep -v upgrade | xargs readlink -f)
 
 env:
   - DEBUG=false
