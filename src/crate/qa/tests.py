@@ -1,5 +1,6 @@
 import os
 import sys
+import uuid
 import time
 import math
 import shutil
@@ -7,19 +8,39 @@ import operator
 import tempfile
 from pprint import pformat
 from threading import Thread
-from typing import NamedTuple
 from functools import partial
 from collections import OrderedDict
+from typing import Dict, Any, List, NamedTuple
 from distutils.version import StrictVersion as V
 from faker.generator import random
 from faker.providers import BaseProvider
-from cr8.run_crate import CrateNode, get_crate
+from cr8.run_crate import CrateNode, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
 EARTH_RADIUS = 6371  # earth radius in km
+
+
+def test_settings(version: V) -> Dict[str, Any]:
+    s = {
+        'cluster.routing.allocation.disk.watermark.low': '1024k',
+        'cluster.routing.allocation.disk.watermark.high': '512k',
+    }
+    if version >= V('3.0'):
+        s.update({
+            'cluster.routing.allocation.disk.watermark.flood_stage': '256k',
+        })
+    return s
+
+
+def version_from_dir(crate_dir: str) -> V:
+    """
+    Extract StrictVersion from crate download directory.
+    """
+    version_tuple = _extract_version(crate_dir)
+    return V('.'.join([str(v) for v in version_tuple]))
 
 
 def columns_for_table(conn, schema, table):
@@ -94,8 +115,21 @@ class CrateCluster:
             threads.append(t)
         [t.join() for t in threads]
 
+    def stop(self):
+        for node in self._nodes:
+            node.stop()
+
     def node(self):
         return random.choice(self._nodes)
+
+    def __next__(self):
+        return next(self._nodes)
+
+    def __setitem__(self, idx, node):
+        self._nodes[idx] = node
+
+    def __getitem__(self, idx):
+        return self._nodes[idx]
 
 
 class NodeProvider:
@@ -124,7 +158,7 @@ class NodeProvider:
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
             self.assertFalse(port in settings)
         s = {
-            'cluster.name': 'crate-qa-cluster',
+            'cluster.name': str(uuid.uuid4()),
             'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
             'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
             'gateway.recover_after_nodes': str(num_nodes),
@@ -134,24 +168,36 @@ class NodeProvider:
         s.update(settings)
         nodes = []
         for id in range(num_nodes):
+            s['node.name'] = s['cluster.name'] + '--' + str(id)
             nodes.append(self._new_node(version, s))
         return CrateCluster(nodes)
+
+    def upgrade_node(self, old_node, new_version):
+        old_node.stop()
+        self._on_stop.remove(old_node)
+        new_node = self._new_node(new_version, old_node._settings)
+        new_node.start()
+        return new_node
 
     def setUp(self):
         self._path_data = self.mkdtemp()
         self._on_stop = []
 
         def new_node(version, settings={}):
+            crate_dir = get_crate(version)
+            v = version_from_dir(crate_dir)
             s = {
                 'path.data': self._path_data,
-                'cluster.name': 'crate-qa'
+                'cluster.name': 'crate-qa',
             }
             s.update(settings)
+            s.update(test_settings(v))
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+                'CRATE_HOME': crate_dir,
             }
 
-            print(f'# Running CrateDB {version} ...')
+            print(f'# Running CrateDB {version} ({v}) ...')
             if self.DEBUG:
                 s_nice = pformat(s)
                 print(f'with settings: {s_nice}')
@@ -159,12 +205,13 @@ class NodeProvider:
                 print(f'with environment: {e_nice}')
 
             n = CrateNode(
-                crate_dir=get_crate(version),
+                crate_dir=crate_dir,
                 keep_data=True,
                 settings=s,
                 env=e,
             )
-            self._on_stop.append(n.stop)
+            n._settings = s  # CrateNode does not hold its settings
+            self._on_stop.append(n)
             return n
         self._new_node = new_node
 
@@ -176,6 +223,6 @@ class NodeProvider:
         self._process_on_stop()
 
     def _process_on_stop(self):
-        for to_stop in self._on_stop:
-            to_stop()
+        for n in self._on_stop:
+            n.stop()
         self._on_stop.clear()
