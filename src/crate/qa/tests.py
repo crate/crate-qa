@@ -1,26 +1,20 @@
 import os
-import sys
 import uuid
 import time
-import math
 import shutil
-import operator
 import tempfile
 from pprint import pformat
 from threading import Thread
-from functools import partial
 from collections import OrderedDict
-from typing import Dict, Any, List, NamedTuple
+from typing import Dict, Any, NamedTuple
 from distutils.version import StrictVersion as V
 from faker.generator import random
-from faker.providers import BaseProvider
 from cr8.run_crate import CrateNode, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
-EARTH_RADIUS = 6371  # earth radius in km
 
 
 def test_settings(version: V) -> Dict[str, Any]:
