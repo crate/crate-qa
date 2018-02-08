@@ -1,6 +1,8 @@
 import unittest
 from io import BytesIO
 from crate.client import connect
+from crate.client.cursor import Cursor
+from crate.client.connection import Connection
 from crate.qa.tests import VersionDef, NodeProvider, \
     wait_for_active_shards, insert_data, gen_id
 
@@ -25,6 +27,7 @@ UPGRADE_PATHS = (
         VersionDef('latest-nightly', False),
     )
 )
+
 
 CREATE_DOC_TABLE = '''
 CREATE TABLE t1 (
@@ -95,7 +98,7 @@ def path_repr(path):
     return f'{versions[0]} -> {versions[-1]}'
 
 
-class BwcTest(NodeProvider, unittest.TestCase):
+class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
@@ -142,4 +145,71 @@ class BwcTest(NodeProvider, unittest.TestCase):
                 blobs = conn.get_blob_container('b1')
                 run_selects(cursor, blobs, digest)
                 cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
+            self._process_on_stop()
+
+
+class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
+
+    CLUSTER_SETTINGS = {
+        'license.enterprise': 'true',
+        'lang.js.enabled': 'true',
+        'cluster.name': gen_id(),
+    }
+
+    SUPPORTED_VERSIONS = (
+        '2.3.x',
+        'latest-nightly',
+    )
+
+    def test_metadata_compatibility(self):
+        nodes = 3
+
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE USER user_a;
+            ''')
+            cursor.execute('''
+                GRANT ALL PRIVILEGES ON SCHEMA doc TO user_a;
+            ''')
+            cursor.execute('''
+                CREATE FUNCTION fact(LONG)
+                RETURNS LONG
+                LANGUAGE JAVASCRIPT
+                AS 'function fact(a) { return a < 2 ? 0 : a * (a - 1); }';
+            ''')
+        self._process_on_stop()
+
+        for version in self.SUPPORTED_VERSIONS[1:]:
+            cluster = self._new_cluster(version,
+                                        nodes,
+                                        self.CLUSTER_SETTINGS)
+            cluster.start()
+            with connect(cluster.node().http_url) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT name, superuser
+                    FROM sys.users
+                    ORDER BY superuser, name;
+                ''')
+                rs = cursor.fetchall()
+                self.assertEqual(['user_a', False], rs[0])
+                self.assertEqual(['crate', True], rs[1])
+                cursor.execute('''
+                    SELECT fact(100);
+                ''')
+                self.assertEqual(9900, cursor.fetchone()[0])
+                cursor.execute('''
+                    SELECT class, grantee, ident, state, type FROM sys.privileges;
+                ''')
+                self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
+                                  ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
+                                  ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
+                                 cursor.fetchall())
+
+
             self._process_on_stop()

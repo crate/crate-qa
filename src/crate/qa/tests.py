@@ -1,4 +1,5 @@
 import os
+import math
 import time
 import shutil
 import string
@@ -158,15 +159,15 @@ class NodeProvider:
         s = {
             'cluster.name': gen_id(),
             'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
-            'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
-            'gateway.recover_after_nodes': str(num_nodes),
-            'gateway.expected_nodes': str(num_nodes),
-            'node.max_local_storage_nodes': str(num_nodes),
+            'discovery.zen.minimum_master_nodes': math.floor(num_nodes / 2.0 + 1),
+            'gateway.recover_after_nodes': num_nodes,
+            'gateway.expected_nodes': num_nodes,
+            'node.max_local_storage_nodes': num_nodes,
         }
         s.update(settings)
         nodes = []
         for id in range(num_nodes):
-            s['node.name'] = s['cluster.name'] + '--' + str(id)
+            s['node.name'] = s['cluster.name'] + '-' + str(id)
             nodes.append(self._new_node(version, s))
         return CrateCluster(nodes)
 
@@ -214,11 +215,11 @@ class NodeProvider:
         self._new_node = new_node
 
     def tearDown(self):
+        self._process_on_stop()
         for tmp in self.tmpdirs:
             print(f'# Removing temporary directory {tmp}')
             shutil.rmtree(tmp, ignore_errors=True)
         self.tmpdirs.clear()
-        self._process_on_stop()
 
     def _process_on_stop(self):
         for n in self._on_stop:
