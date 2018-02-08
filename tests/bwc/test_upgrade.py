@@ -2,7 +2,7 @@ import unittest
 from io import BytesIO
 from crate.client import connect
 from crate.qa.tests import VersionDef, NodeProvider, \
-    wait_for_active_shards, insert_data
+    wait_for_active_shards, insert_data, gen_id
 
 UPGRADE_PATHS = (
     (
@@ -97,6 +97,10 @@ def path_repr(path):
 
 class BwcTest(NodeProvider, unittest.TestCase):
 
+    CLUSTER_SETTINGS = {
+        'cluster.name': gen_id(),
+    }
+
     def test_upgrade_paths(self):
         for path in get_test_paths():
             with self.subTest(path_repr(path)):
@@ -113,7 +117,7 @@ class BwcTest(NodeProvider, unittest.TestCase):
         then goes through all subsequent versions - each time verifying that a
         few simple selects work.
         """
-        cluster = self._new_cluster(versions[0][0], nodes)
+        cluster = self._new_cluster(versions[0][0], nodes, self.CLUSTER_SETTINGS)
         cluster.start()
         with connect(cluster.node().http_url) as conn:
             c = conn.cursor()
@@ -126,7 +130,7 @@ class BwcTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version, upgrade_segments in versions[1:]:
-            cluster = self._new_cluster(version, nodes)
+            cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
             cluster.start()
             with connect(cluster.node().http_url) as conn:
                 cursor = conn.cursor()

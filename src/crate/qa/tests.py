@@ -1,7 +1,7 @@
 import os
-import uuid
 import time
 import shutil
+import string
 import tempfile
 from pprint import pformat
 from threading import Thread
@@ -15,6 +15,10 @@ from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
+
+
+def gen_id() -> str:
+    return ''.join([random.choice(string.hexdigits) for x in range(12)])
 
 
 def test_settings(version: V) -> Dict[str, Any]:
@@ -152,7 +156,7 @@ class NodeProvider:
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
             self.assertFalse(port in settings)
         s = {
-            'cluster.name': str(uuid.uuid4()),
+            'cluster.name': gen_id(),
             'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
             'discovery.zen.minimum_master_nodes': str(int(num_nodes / 2.0 + 1)),
             'gateway.recover_after_nodes': str(num_nodes),
