@@ -43,13 +43,26 @@ CREATE TABLE t1 (
     col_geo_point GEO_POINT,
     col_geo_shape GEO_SHAPE,
     col_ip IP,
-    col_timestamp TIMESTAMP
+    col_timestamp TIMESTAMP,
+    text STRING,
+    INDEX text_ft USING FULLTEXT(text) WITH (analyzer=myanalysis)
 ) CLUSTERED INTO 3 SHARDS WITH (number_of_replicas = 0)
 '''
 
 CREATE_BLOB_TABLE = '''
 CREATE BLOB TABLE b1
 CLUSTERED INTO 3 SHARDS WITH (number_of_replicas = 0)
+'''
+
+CREATE_ANALYZER = '''
+CREATE ANALYZER myanalysis (
+  TOKENIZER whitespace,
+  TOKEN_FILTERS (lowercase, kstem),
+  CHAR_FILTERS (mymapping WITH (
+    type = 'mapping',
+    mappings = ['ph=>f', 'qu=>q', 'foo=>bar']
+  ))
+)
 '''
 
 # Use statements that use different code paths to retrieve the values
@@ -70,6 +83,7 @@ SELECT_STATEMENTS = (
     'SELECT id, distance(col_geo_point, [0.0, 0.0]) FROM t1',
     'SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)',
     'SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1',
+    'SELECT _score, text FROM t1 WHERE match(text_ft, \'fase\')',
 )
 
 
@@ -124,7 +138,11 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url) as conn:
             c = conn.cursor()
+            c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
+            c.execute('''
+                INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
+            ''')
             insert_data(conn, 'doc', 't1', 10)
             c.execute(CREATE_BLOB_TABLE)
             container = conn.get_blob_container('b1')
