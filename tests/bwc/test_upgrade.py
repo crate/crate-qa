@@ -222,7 +222,9 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                 ''')
                 self.assertEqual(9900, cursor.fetchone()[0])
                 cursor.execute('''
-                    SELECT class, grantee, ident, state, type FROM sys.privileges;
+                    SELECT class, grantee, ident, state, type
+                    FROM sys.privileges
+                    ORDER BY class, grantee, ident, state, type
                 ''')
                 self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
                                   ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
