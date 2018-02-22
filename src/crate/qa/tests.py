@@ -10,12 +10,33 @@ from collections import OrderedDict
 from typing import Dict, Any, NamedTuple
 from distutils.version import StrictVersion as V
 from faker.generator import random
-from cr8.run_crate import CrateNode, get_crate, _extract_version
+from cr8.run_crate import CrateNode, LineBuffer, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
+
+def devnull(*args):
+    pass
+
+print_if_debug = DEBUG and print or devnull
+
+
+def debug_node_start(node: CrateNode):
+    buf = LineBuffer()
+    node.monitor.consumers.append(buf)
+    start = time.time()
+    print_if_debug(f'# NODE START: start @ {start}')
+    try:
+        node.start()
+    finally:
+        node.monitor.consumers.remove(buf)
+        for line in buf.lines:
+            print_if_debug(f'  {line}')
+        duration = time.time() - start
+        print_if_debug(f'# NODE START: end @ {start}')
+        print_if_debug(f'# NODE START: duration : {duration}')
 
 
 def gen_id() -> str:
@@ -175,7 +196,7 @@ class NodeProvider:
         old_node.stop()
         self._on_stop.remove(old_node)
         new_node = self._new_node(new_version, old_node._settings)
-        new_node.start()
+        debug_node_start(new_node)
         return new_node
 
     def setUp(self):
