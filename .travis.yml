@@ -6,6 +6,7 @@ python:
 before_install:
     - pip install --upgrade setuptools
     - pip uninstall -y six
+    - sync && echo 3 | sudo tee /proc/sys/vm/drop_caches # https://github.com/elastic/elasticsearch/issues/28650
 
 install:
     - pip install --upgrade --process-dependency-links -e .
