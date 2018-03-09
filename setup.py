@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import functools
-from setuptools import setup, find_packages
+from setuptools import setup
 
 
 def read(filename):
@@ -30,12 +30,9 @@ setup(
     packages=['crate.qa'],
     namespace_packages=['crate'],
     install_requires=[
-        'cr8==0.12-master',
+        'cr8',
         'Cython',
         'asyncpg'
-    ],
-    dependency_links=[
-        'git+https://github.com/mfussenegger/cr8.git@master#egg=cr8-0.12-master',
     ],
     python_requires='>=3.6',
     classifiers=[
