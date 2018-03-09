@@ -1,4 +1,5 @@
 import unittest
+from typing import NamedTuple, Iterable
 from io import BytesIO
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
@@ -24,7 +25,7 @@ UPGRADE_PATHS = (
         VersionDef('2.2.x', False),
         VersionDef('2.3.x', True),
         VersionDef('latest-nightly', False),
-    )
+    ),
 )
 
 
@@ -64,34 +65,48 @@ CREATE ANALYZER myanalysis (
 )
 '''
 
+
+class Statement(NamedTuple):
+    stmt: str
+    unsupported_versions: Iterable[str]
+
+
 # Use statements that use different code paths to retrieve the values
 SELECT_STATEMENTS = (
-    'SELECT _id, _uid, * FROM t1',
-    'SELECT * FROM t1 WHERE id = 1',
-    'SELECT * FROM t1 WHERE col_ip > \'127.0.0.1\'',
-    'SELECT COUNT(DISTINCT col_byte),'
-    ' COUNT(DISTINCT col_short),'
-    ' COUNT(DISTINCT col_int),'
-    ' COUNT(DISTINCT col_long),'
-    ' COUNT(DISTINCT col_float),'
-    ' COUNT(DISTINCT col_double),'
-    ' COUNT(DISTINCT col_string),'
-    ' COUNT(DISTINCT col_ip),'
-    ' COUNT(DISTINCT col_timestamp)'
-    ' FROM t1',
-    'SELECT id, distance(col_geo_point, [0.0, 0.0]) FROM t1',
-    'SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)',
-    'SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1',
-    'SELECT _score, text FROM t1 WHERE match(text_ft, \'fase\')',
+    Statement('SELECT _id, _uid, * FROM t1', []),
+    Statement('SELECT * FROM t1 WHERE id = 1', []),
+    Statement('SELECT * FROM t1 WHERE col_ip > \'127.0.0.1\'', []),
+    Statement('''
+    SELECT
+        COUNT(DISTINCT col_byte),
+        COUNT(DISTINCT col_short),
+        COUNT(DISTINCT col_int),
+        COUNT(DISTINCT col_long),
+        COUNT(DISTINCT col_float),
+        COUNT(DISTINCT col_double),
+        COUNT(DISTINCT col_string),
+        COUNT(DISTINCT col_timestamp)
+    FROM t1
+    ''', []),
+    Statement(
+        'SELECT COUNT(DISTINCT col_ip) FROM t1',
+        ['2.0.x', '2.1.x']
+    ),
+    Statement('SELECT id, distance(col_geo_point, [0.0, 0.0]) FROM t1', []),
+    Statement('SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)', []),
+    Statement('SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1', []),
+    Statement('SELECT _score, text FROM t1 WHERE match(text_ft, \'fase\')', []),
 )
 
 
-def run_selects(c, blob_container, digest):
+def run_selects(c, blob_container, digest, version):
     for stmt in SELECT_STATEMENTS:
+        if version in stmt.unsupported_versions:
+            continue
         try:
-            c.execute(stmt)
+            c.execute(stmt.stmt)
         except ProgrammingError as e:
-            raise ProgrammingError('Error executing ' + stmt) from e
+            raise ProgrammingError('Error executing ' + stmt.stmt) from e
     blob_container.get(digest)
 
 
@@ -110,7 +125,7 @@ def path_repr(path):
 
         from_version -> to_version
     """
-    versions = [v for v,_ in path]
+    versions = [v for v, _ in path]
     return f'{versions[0]} -> {versions[-1]}'
 
 
@@ -149,7 +164,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             c.execute(CREATE_BLOB_TABLE)
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
-            run_selects(c, container, digest)
+            run_selects(c, container, digest, versions[0].version)
         self._process_on_stop()
 
         for version, upgrade_segments in versions[1:]:
@@ -163,7 +178,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
                 cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
                 blobs = conn.get_blob_container('b1')
-                run_selects(cursor, blobs, digest)
+                run_selects(cursor, blobs, digest, version)
                 cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
             self._process_on_stop()
 
@@ -232,6 +247,5 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                                   ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
                                   ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
                                  cursor.fetchall())
-
 
             self._process_on_stop()
