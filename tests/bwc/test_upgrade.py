@@ -1,8 +1,7 @@
 import unittest
 from io import BytesIO
 from crate.client import connect
-from crate.client.cursor import Cursor
-from crate.client.connection import Connection
+from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import VersionDef, NodeProvider, \
     wait_for_active_shards, insert_data, gen_id
 
@@ -89,7 +88,10 @@ SELECT_STATEMENTS = (
 
 def run_selects(c, blob_container, digest):
     for stmt in SELECT_STATEMENTS:
-        c.execute(stmt)
+        try:
+            c.execute(stmt)
+        except ProgrammingError as e:
+            raise ProgrammingError('Error executing ' + stmt) from e
     blob_container.get(digest)
 
 
