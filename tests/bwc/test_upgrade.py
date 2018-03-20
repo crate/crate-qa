@@ -144,6 +144,27 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 finally:
                     self.tearDown()
 
+    def _upgrade(self, cursor, upgrade_segments, num_retries=3):
+        """
+        Performs the upgrade of the indices and retries in case of
+        ProgrammingErrors.
+
+        The retry was added because the wait_for_active shards check
+        collects the shard information directly from the nodes. The
+        internal ES code, however, retrieves the shard information
+        from the ClusterState. A retry is necessary in case the shards
+        are ready but the cluster state hasn't been updated yet.
+        """
+        try:
+            if upgrade_segments:
+                cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')
+                cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
+        except ProgrammingError as e:
+            if num_retries > 0 and "PrimaryMissingActionException" in e.message:
+                self._upgrade(cursor, upgrade_segments, num_retries - 1)
+            else:
+                raise e
+
     def _test_upgrade_path(self, versions, nodes):
         """ Test upgrade path across specified versions.
 
@@ -173,9 +194,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             with connect(cluster.node().http_url) as conn:
                 cursor = conn.cursor()
                 wait_for_active_shards(cursor, 6)
-                if upgrade_segments:
-                    cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')
-                    cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
+                self._upgrade(cursor, upgrade_segments)
                 cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
                 blobs = conn.get_blob_container('b1')
                 run_selects(cursor, blobs, digest, version)
