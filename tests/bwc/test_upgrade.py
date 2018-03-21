@@ -174,7 +174,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         """
         cluster = self._new_cluster(versions[0][0], nodes, self.CLUSTER_SETTINGS)
         cluster.start()
-        with connect(cluster.node().http_url) as conn:
+        with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
@@ -191,7 +191,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         for version, upgrade_segments in versions[1:]:
             cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
             cluster.start()
-            with connect(cluster.node().http_url) as conn:
+            with connect(cluster.node().http_url, error_trace=True) as conn:
                 cursor = conn.cursor()
                 wait_for_active_shards(cursor, 6)
                 self._upgrade(cursor, upgrade_segments)
@@ -222,7 +222,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                                     nodes,
                                     self.CLUSTER_SETTINGS)
         cluster.start()
-        with connect(cluster.node().http_url) as conn:
+        with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE USER user_a;
@@ -243,7 +243,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                                         nodes,
                                         self.CLUSTER_SETTINGS)
             cluster.start()
-            with connect(cluster.node().http_url) as conn:
+            with connect(cluster.node().http_url, error_trace=True) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT name, superuser

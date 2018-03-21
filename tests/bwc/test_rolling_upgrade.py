@@ -44,7 +44,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
         cluster = self._new_cluster(path.from_version, nodes)
         cluster.start()
-        with connect(cluster.node().http_url) as conn:
+        with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute(f'''
                 CREATE TABLE doc.t1 (
@@ -58,7 +58,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         for idx, node in enumerate(cluster):
             new_node = self.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
-            with connect(new_node.http_url) as conn:
+            with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()
                 wait_for_active_shards(c, shards + replicas * shards)
                 c.execute(f'''

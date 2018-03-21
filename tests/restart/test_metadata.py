@@ -15,7 +15,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
     def test_udf(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE FUNCTION subtract(integer, integer)
@@ -26,7 +26,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             SELECT routine_name FROM information_schema.routines
@@ -38,13 +38,13 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
     def test_user_information(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("CREATE USER user_a")
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT name, superuser FROM sys.users ORDER BY name")
             result = cursor.fetchall()
@@ -57,7 +57,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
     def test_user_privileges(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("CREATE USER user_a")
             cursor.execute("CREATE USER user_b")
@@ -68,7 +68,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             SELECT grantee, ident, state, type FROM sys.privileges
@@ -89,7 +89,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
     def test_ingestion_rules(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE TABLE mqtt_table (
@@ -107,7 +107,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             SELECT rule_name, target_table, source_ident

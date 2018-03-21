@@ -15,7 +15,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
     def test_partioned_table_template(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE TABLE parted_table (
@@ -28,7 +28,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             SELECT table_name,
@@ -63,7 +63,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
     def test_query_partitioned_table(self):
         node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE TABLE parted_table (
@@ -81,7 +81,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             wait_for_active_shards(cursor)
             cursor.execute("""

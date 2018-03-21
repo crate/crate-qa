@@ -33,7 +33,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
         }
         node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
             cur.execute('''
                 SELECT name FROM sys.nodes

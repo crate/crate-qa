@@ -13,7 +13,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
     def test_blob_index(self):
         node = self._new_node(self.CRATE_VERSION)
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE BLOB TABLE myblobs
@@ -23,7 +23,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             wait_for_active_shards(cursor)
             cursor.execute("""
@@ -40,7 +40,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
         node = self._new_node(self.CRATE_VERSION)
         node.start()
         digest = ''
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("""
             CREATE BLOB TABLE myblobs
@@ -52,7 +52,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
         node.stop()
 
         node.start()
-        with connect(node.http_url) as conn:
+        with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             wait_for_active_shards(cursor)
             cursor.execute("SELECT count(*) FROM blob.myblobs WHERE digest = ?", (digest,))
