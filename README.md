@@ -27,6 +27,7 @@ pip install --upgrade --process-dependency-links -e .
 * `startup/`: test CrateDB startup with critical settings provided by CLI and crate.yml
 * `restart/`: test that metadata/partitions/blobs are persisted across cluster restarts
 * `bwc/`: backwards compatibility tests
+* `client_tests/`: smoke test various clients written in Python, Go, etc.
 
 ### Usage
 
