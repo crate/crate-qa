@@ -136,7 +136,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             cur = conn.cursor()
             # User Management
             with self.assertRaisesRegex(ProgrammingError,
-                                        'Table \'sys.users\' unknown'):
+                                        'Relation \'sys.users\' unknown'):
                 cur.execute('''
                     SELECT name, superuser
                     FROM sys.users
