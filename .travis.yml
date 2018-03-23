@@ -14,6 +14,7 @@ install:
 
 script:
   - tests/client_tests/go/run.sh
+  - tests/client_tests/php/run.sh
   - find tests -name "*.py" | xargs mypy --ignore-missing-imports
   - find src -name "*.py" | xargs mypy --ignore-missing-imports
   - cd tests && python -m unittest -vvv $(find . -name "test_*.py" | grep -v test_upgrade.py | xargs readlink -f)
