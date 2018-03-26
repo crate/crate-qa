@@ -4,3 +4,4 @@
 .eggs/
 env/
 .mypy_cache/
+.stack-work/
