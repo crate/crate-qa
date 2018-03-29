@@ -1,4 +1,5 @@
 import unittest
+import time
 from typing import NamedTuple, Iterable
 from io import BytesIO
 from crate.client import connect
@@ -160,7 +161,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')
                 cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
         except ProgrammingError as e:
+            print(f'OPTIMIZE failed: {e.message} (num_retries={num_retries})')
             if num_retries > 0 and "PrimaryMissingActionException" in e.message:
+                time.sleep(1 / (num_retries + 1))
                 self._upgrade(cursor, upgrade_segments, num_retries - 1)
             else:
                 raise e
