@@ -117,3 +117,56 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             result = cursor.fetchone()
             expected = ['mqtt_table_rule', 'doc.mqtt_table', 'mqtt']
             self.assertEqual(result, expected)
+
+    def test_views(self):
+        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        node.start()
+        with connect(node.http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            CREATE TABLE s.t1 (
+                ts TIMESTAMP,
+                day TIMESTAMP GENERATED ALWAYS AS date_trunc('day', ts),
+                value float,
+                type SHORT
+            ) PARTITIONED BY (day)
+            WITH (number_of_replicas=0)
+            """)
+            cursor.execute("""
+            CREATE VIEW s.v1 AS
+                SELECT ts, value FROM s.t1 WHERE type = 1;
+            """)
+            cursor.execute("""
+            CREATE VIEW s.v2 AS
+                SELECT * FROM s.t1 WHERE day > CURRENT_TIMESTAMP - 1000 * 60 * 60 * 24;
+            """)
+        node.stop()
+
+        node.start()
+        with connect(node.http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_type = 'VIEW'
+            ORDER BY table_schema, table_name
+            """)
+            result = cursor.fetchall()
+            self.assertEqual(result,
+                             [['s', 'v1'],
+                              ['s', 'v2']])
+
+            cursor.execute("""
+            SELECT table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_name IN ('v1', 'v2')
+            ORDER BY table_name, column_name, data_type
+            """)
+            result = cursor.fetchall()
+            self.assertEqual(result,
+                             [['v1', 'ts', 'timestamp'],
+                              ['v1', 'value', 'float'],
+                              ['v2', 'day', 'timestamp'],
+                              ['v2', 'ts', 'timestamp'],
+                              ['v2', 'type', 'short'],
+                              ['v2', 'value', 'float']])
