@@ -1,9 +1,12 @@
 import os
+import sys
 import math
 import time
 import shutil
 import string
 import tempfile
+import functools
+from unittest.case import _Outcome
 from pprint import pformat
 from threading import Thread
 from collections import OrderedDict
@@ -17,26 +20,8 @@ from cr8.insert_json import to_insert
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
 
-def devnull(*args):
-    pass
 
-print_if_debug = DEBUG and print or devnull
-
-
-def debug_node_start(node: CrateNode):
-    buf = LineBuffer()
-    node.monitor.consumers.append(buf)
-    start = time.time()
-    print_if_debug(f'# NODE START: start @ {start}')
-    try:
-        node.start()
-    finally:
-        node.monitor.consumers.remove(buf)
-        for line in buf.lines:
-            print_if_debug(f'  {line}')
-        duration = time.time() - start
-        print_if_debug(f'# NODE START: end @ {start}')
-        print_if_debug(f'# NODE START: duration : {duration}')
+print_error = functools.partial(print, file=sys.stderr)
 
 
 def gen_id() -> str:
@@ -108,12 +93,12 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
         duration *= f
 
     if DEBUG:
-        print('-' * 79)
+        print('-' * 70)
         print(f'waited: {waited} last duration: {duration} timeout: {timeout}')
         cursor.execute('SELECT count(*), table_name, state FROM sys.shards GROUP BY 2, 3 ORDER BY 2')
         rs = cursor.fetchall()
         print(f'=== {rs}')
-        print('-' * 79)
+        print('-' * 70)
     raise TimeoutError(f"Shards didn't become active within {timeout}s.")
 
 
@@ -158,6 +143,10 @@ class NodeProvider:
     CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
+    # _outcome is an attribute of unittest.TestCase
+    # we need to declare it so that static analysis with mypy does not fail
+    _outcome: _Outcome
+
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []
         super().__init__(*args, **kwargs)
@@ -196,12 +185,13 @@ class NodeProvider:
         old_node.stop()
         self._on_stop.remove(old_node)
         new_node = self._new_node(new_version, old_node._settings)
-        debug_node_start(new_node)
+        new_node.start()
         return new_node
 
     def setUp(self):
         self._path_data = self.mkdtemp()
         self._on_stop = []
+        self._log_consumers = []
 
         def new_node(version, settings={}):
             crate_dir = get_crate(version)
@@ -217,8 +207,8 @@ class NodeProvider:
                 'CRATE_HOME': crate_dir,
             }
 
-            print(f'# Running CrateDB {version} ({v}) ...')
             if self.DEBUG:
+                print(f'# Running CrateDB {version} ({v}) ...')
                 s_nice = pformat(s)
                 print(f'with settings: {s_nice}')
                 e_nice = pformat(e)
@@ -231,14 +221,17 @@ class NodeProvider:
                 env=e,
             )
             n._settings = s  # CrateNode does not hold its settings
+            self._add_log_consumer(n)
             self._on_stop.append(n)
             return n
         self._new_node = new_node
 
     def tearDown(self):
+        self._crate_logs_on_failure()
         self._process_on_stop()
         for tmp in self.tmpdirs:
-            print(f'# Removing temporary directory {tmp}')
+            if DEBUG:
+                print(f'# Removing temporary directory {tmp}')
             shutil.rmtree(tmp, ignore_errors=True)
         self.tmpdirs.clear()
 
@@ -246,3 +239,23 @@ class NodeProvider:
         for n in self._on_stop:
             n.stop()
         self._on_stop.clear()
+
+    def _add_log_consumer(self, node: CrateNode):
+        buffer = LineBuffer()
+        node.monitor.consumers.append(buffer)
+        self._log_consumers.append((node, buffer))
+
+    def _crate_logs_on_failure(self):
+        for node, buffer in self._log_consumers:
+            node.monitor.consumers.remove(buffer)
+            if self._has_error():
+                print_error('=' * 70)
+                print_error('CrateDB logs for test ' + self.id())
+                print_error('-' * 70)
+                for line in buffer.lines:
+                    print_error(line)
+                print_error('-' * 70)
+        self._log_consumers.clear()
+
+    def _has_error(self) -> bool:
+        return any(error for (_, error) in self._outcome.errors)
