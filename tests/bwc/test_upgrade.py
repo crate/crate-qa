@@ -192,17 +192,24 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version, upgrade_segments in versions[1:]:
-            cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
-            cluster.start()
-            with connect(cluster.node().http_url, error_trace=True) as conn:
-                cursor = conn.cursor()
-                wait_for_active_shards(cursor, 6)
-                self._upgrade(cursor, upgrade_segments)
-                cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
-                blobs = conn.get_blob_container('b1')
-                run_selects(cursor, blobs, digest, version)
-                cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
-            self._process_on_stop()
+            self.assert_data_persistence(version, nodes, upgrade_segments)
+
+        # restart with latest version
+        version, upgrade_segments = versions[-1]
+        self.assert_data_persistence(version, nodes, upgrade_segments)
+
+    def assert_data_persistence(self, version, nodes):
+        cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            wait_for_active_shards(cursor, 6)
+            self._upgrade(cursor, upgrade_segments)
+            cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
+            blobs = conn.get_blob_container('b1')
+            run_selects(cursor, blobs, digest, version)
+            cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
+        self._process_on_stop()
 
 
 class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
@@ -242,32 +249,38 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version in self.SUPPORTED_VERSIONS[1:]:
-            cluster = self._new_cluster(version,
-                                        nodes,
-                                        self.CLUSTER_SETTINGS)
-            cluster.start()
-            with connect(cluster.node().http_url, error_trace=True) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT name, superuser
-                    FROM sys.users
-                    ORDER BY superuser, name;
-                ''')
-                rs = cursor.fetchall()
-                self.assertEqual(['user_a', False], rs[0])
-                self.assertEqual(['crate', True], rs[1])
-                cursor.execute('''
-                    SELECT fact(100);
-                ''')
-                self.assertEqual(9900, cursor.fetchone()[0])
-                cursor.execute('''
-                    SELECT class, grantee, ident, state, type
-                    FROM sys.privileges
-                    ORDER BY class, grantee, ident, state, type
-                ''')
-                self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
-                                  ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
-                                  ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
-                                 cursor.fetchall())
+            self.assert_meta_data(version, nodes)
+
+        # restart with latest version
+        self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes)
+
+    def assert_meta_data(self, version, nodes):
+        cluster = self._new_cluster(version,
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT name, superuser
+                FROM sys.users
+                ORDER BY superuser, name;
+            ''')
+            rs = cursor.fetchall()
+            self.assertEqual(['user_a', False], rs[0])
+            self.assertEqual(['crate', True], rs[1])
+            cursor.execute('''
+                SELECT fact(100);
+            ''')
+            self.assertEqual(9900, cursor.fetchone()[0])
+            cursor.execute('''
+                SELECT class, grantee, ident, state, type
+                FROM sys.privileges
+                ORDER BY class, grantee, ident, state, type
+            ''')
+            self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
+                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
+                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
+                             cursor.fetchall())
 
             self._process_on_stop()
