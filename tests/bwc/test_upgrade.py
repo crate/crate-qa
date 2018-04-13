@@ -198,7 +198,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         version, upgrade_segments = versions[-1]
         self.assert_data_persistence(version, nodes, upgrade_segments)
 
-    def assert_data_persistence(self, version, nodes):
+    def assert_data_persistence(self, version, nodes, upgrade_segments):
         cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
