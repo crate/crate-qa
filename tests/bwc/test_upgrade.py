@@ -100,7 +100,7 @@ SELECT_STATEMENTS = (
 )
 
 
-def run_selects(c, blob_container, digest, version):
+def run_selects(c, version):
     for stmt in SELECT_STATEMENTS:
         if version in stmt.unsupported_versions:
             continue
@@ -108,7 +108,6 @@ def run_selects(c, blob_container, digest, version):
             c.execute(stmt.stmt)
         except ProgrammingError as e:
             raise ProgrammingError('Error executing ' + stmt.stmt) from e
-    blob_container.get(digest)
 
 
 def get_test_paths():
@@ -177,6 +176,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         """
         cluster = self._new_cluster(versions[0][0], nodes, self.CLUSTER_SETTINGS)
         cluster.start()
+        digest = None
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute(CREATE_ANALYZER)
@@ -186,19 +186,20 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             ''')
             insert_data(conn, 'doc', 't1', 10)
             c.execute(CREATE_BLOB_TABLE)
+            run_selects(c, versions[0].version)
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
-            run_selects(c, container, digest, versions[0].version)
+            container.get(digest)
         self._process_on_stop()
 
         for version, upgrade_segments in versions[1:]:
-            self.assert_data_persistence(version, nodes, upgrade_segments)
+            self.assert_data_persistence(version, nodes, upgrade_segments, digest)
 
         # restart with latest version
         version, upgrade_segments = versions[-1]
-        self.assert_data_persistence(version, nodes, upgrade_segments)
+        self.assert_data_persistence(version, nodes, upgrade_segments, digest)
 
-    def assert_data_persistence(self, version, nodes, upgrade_segments):
+    def assert_data_persistence(self, version, nodes, upgrade_segments, digest):
         cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -206,8 +207,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             wait_for_active_shards(cursor, 6)
             self._upgrade(cursor, upgrade_segments)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
-            blobs = conn.get_blob_container('b1')
-            run_selects(cursor, blobs, digest, version)
+            run_selects(cursor, version)
+            container = conn.get_blob_container('b1')
+            container.get(digest)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
         self._process_on_stop()
 
