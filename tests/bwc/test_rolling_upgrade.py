@@ -14,7 +14,8 @@ class UpgradePath(NamedTuple):
 
 
 ROLLING_UPGRADES = (
-    UpgradePath('2.3.x', 'latest-nightly'),
+    UpgradePath('3.0.x', 'latest-nightly'),
+    UpgradePath('2.3.0', '2.3.x'),
 )
 
 
