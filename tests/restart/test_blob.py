@@ -11,7 +11,7 @@ from crate.qa.tests import NodeProvider, wait_for_active_shards
 class BlobTestCase(NodeProvider, unittest.TestCase):
 
     def test_blob_index(self):
-        node = self._new_node(self.CRATE_VERSION)
+        (node, _) = self._new_node(self.CRATE_VERSION)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -37,7 +37,7 @@ class BlobTestCase(NodeProvider, unittest.TestCase):
             self.assertEqual(result[2], '0')
 
     def test_blob_record(self):
-        node = self._new_node(self.CRATE_VERSION)
+        (node, _) = self._new_node(self.CRATE_VERSION)
         node.start()
         digest = ''
         with connect(node.http_url, error_trace=True) as conn:

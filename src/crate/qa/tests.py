@@ -40,11 +40,7 @@ def test_settings(version: V) -> Dict[str, Any]:
     return s
 
 
-def version_from_dir(crate_dir: str) -> V:
-    """
-    Extract StrictVersion from crate download directory.
-    """
-    version_tuple = _extract_version(crate_dir)
+def version_tuple_to_strict_version(version_tuple: tuple) -> V:
     return V('.'.join([str(v) for v in version_tuple]))
 
 
@@ -178,13 +174,13 @@ class NodeProvider:
         nodes = []
         for id in range(num_nodes):
             s['node.name'] = s['cluster.name'] + '-' + str(id)
-            nodes.append(self._new_node(version, s))
+            nodes.append(self._new_node(version, s)[0])
         return CrateCluster(nodes)
 
     def upgrade_node(self, old_node, new_version):
         old_node.stop()
         self._on_stop.remove(old_node)
-        new_node = self._new_node(new_version, old_node._settings)
+        (new_node, _) = self._new_node(new_version, old_node._settings)
         new_node.start()
         return new_node
 
@@ -195,7 +191,8 @@ class NodeProvider:
 
         def new_node(version, settings={}):
             crate_dir = get_crate(version)
-            v = version_from_dir(crate_dir)
+            version_tuple = _extract_version(crate_dir)
+            v = version_tuple_to_strict_version(version_tuple)
             s = {
                 'path.data': self._path_data,
                 'cluster.name': 'crate-qa',
@@ -223,7 +220,7 @@ class NodeProvider:
             n._settings = s  # CrateNode does not hold its settings
             self._add_log_consumer(n)
             self._on_stop.append(n)
-            return n
+            return (n, version_tuple)
         self._new_node = new_node
 
     def tearDown(self):

@@ -13,7 +13,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
     }
 
     def test_udf(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -36,7 +36,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             self.assertEqual(result[0], 'subtract')
 
     def test_user_information(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -55,7 +55,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             self.assertFalse(result[1][1])
 
     def test_user_privileges(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -87,7 +87,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             self.assertEqual(result, expected)
 
     def test_ingestion_rules(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -119,7 +119,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             self.assertEqual(result, expected)
 
     def test_views(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()

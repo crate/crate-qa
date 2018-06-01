@@ -1,6 +1,8 @@
 import os
+import re
 import socket
 import unittest
+from pathlib import Path
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import NodeProvider
@@ -28,7 +30,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'node.name': self.fake.name(),
             'cluster.name': self.fake.bothify(text='????.##'),
         }
-        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
@@ -50,7 +52,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'path.logs': self.mkdtemp(),
             'cluster.name': 'crate',
         }
-        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
@@ -87,7 +89,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'auth.host_based.config.0.protocol': 'http',
         })
 
-        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
         self._assert_enterprise_equal(node, True)
@@ -127,7 +129,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'license.enterprise': False,
         })
 
-        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
         self._assert_enterprise_equal(node, False)
@@ -151,3 +153,58 @@ class StartupTest(NodeProvider, unittest.TestCase):
                 ''')
             # MQTT
             self.assert_mqtt_port(lambda x: x > 0)
+
+    def test_startup_logs(self):
+
+        # Create CRATE_HOME directory
+        tmp_home = self.mkdtemp()
+        Path(tmp_home, 'config').mkdir()
+
+        nodeName = self.fake.last_name()
+        settings = dict({
+            'node.name': nodeName,
+            'path.home': tmp_home,
+        })
+
+        logFilePath = Path(tmp_home, 'crate.log')
+        self.create_log_from_template(logFilePath, tmp_home)
+
+        (node, version_tuple)= self._new_node(self.CRATE_VERSION, settings=settings)
+        node.start()
+
+        # Check entries in log file
+        def verifyAndExtractContentFromLogLine(logLine):
+            self.assertTrue(' [' + nodeName + '] ' in logLine, 'line does not contain correct node name')
+            if '[o.e.n.Node               ]' in line:
+                return logLine.split(' [' + nodeName + '] ')[1]
+            return None
+
+        with open(logFilePath, 'r') as f:
+            for lineIdx, line in enumerate(f):
+                lineCtx = verifyAndExtractContentFromLogLine(line)
+                if lineCtx:
+                    if lineIdx == 1:
+                        self.assertTrue('initializing', lineCtx)
+                    elif lineIdx == 2:
+                        self.assertTrue(re.match(r'node name \[' + nodeName + '\], node ID \[.+\]', lineCtx))
+                    elif lineIdx == 3:
+                        version_str = '.'.join([str(v) for v in version_tuple])
+                        self.assertTrue(re.match(
+                            r'CrateDB version\[' + version_str + '-SNAPSHOT\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]',
+                        lineCtx))
+                    elif lineIdx == 4:
+                        self.assertTrue(re.match(r'JVM arguments \[.+\]', lineCtx))
+                    elif lineIdx == 5:
+                        self.assertTrue('initialized', lineCtx)
+                    elif lineIdx == 6:
+                        self.assertTrue('starting ...', lineCtx)
+                    elif lineIdx == 7:
+                        self.assertTrue('started', lineCtx)
+
+    @staticmethod
+    def create_log_from_template(log_file_path, tmp_home):
+        # Copy log4j2.properties and replace path to crate.log output file
+        with open(Path(Path(__file__).parent, "log4j2_appendtofile.properties"), "r") as fin, \
+             open(Path(tmp_home, "config", "log4j2.properties"), "w") as fout:
+            for line in fin:
+                fout.write(line.replace("<log_file_path>", str(log_file_path)))

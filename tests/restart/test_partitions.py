@@ -13,7 +13,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
     }
 
     def test_partioned_table_template(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -61,7 +61,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
         self.assertEqual(settings['index']['number_of_replicas'], '0')
 
     def test_query_partitioned_table(self):
-        node = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cursor = conn.cursor()

@@ -1,4 +1,3 @@
-import os
 import shutil
 import unittest
 from pathlib import Path
@@ -31,7 +30,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
         settings = {
             'path.home': tmp_home,
         }
-        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()

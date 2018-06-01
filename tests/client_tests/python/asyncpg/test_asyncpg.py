@@ -9,7 +9,7 @@ from crate.qa.tests import (
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):
 
     def test_basic_statements(self):
-        node = self._new_node(self.CRATE_VERSION)
+        (node, _) = self._new_node(self.CRATE_VERSION)
         node.start()
 
         async def run(hosts, future):
