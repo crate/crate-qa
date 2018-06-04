@@ -204,7 +204,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
     @staticmethod
     def create_log_from_template(log_file_path, tmp_home):
         # Copy log4j2.properties and replace path to crate.log output file
-        with open(Path(Path(__file__).parent, "log4j2_appendtofile.properties"), "r") as fin, \
+        with open(Path(Path(__file__).parent, "log4j2_file.properties"), "r") as fin, \
              open(Path(tmp_home, "config", "log4j2.properties"), "w") as fout:
             for line in fin:
                 fout.write(line.replace("<log_file_path>", str(log_file_path)))

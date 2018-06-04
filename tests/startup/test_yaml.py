@@ -24,7 +24,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             for k, v in crate_yml.items():
                 fp.write(f'{k}: {v}\n')
         # Copy log4j2.properties
-        shutil.copyfile(Path(Path(__file__).parent, 'log4j2.properties'),
+        shutil.copyfile(Path(Path(__file__).parent, 'log4j2_console.properties'),
                         Path(tmp_home, 'config', 'log4j2.properties'))
 
         settings = {
