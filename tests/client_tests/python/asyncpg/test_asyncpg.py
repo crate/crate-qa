@@ -1,9 +1,7 @@
 import asyncio
 import asyncpg
 import unittest
-from crate.qa.tests import (
-    NodeProvider
-)
+from crate.qa.tests import NodeProvider
 
 
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):

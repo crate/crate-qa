@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import unittest
-import os
 from io import BytesIO
 from pathlib import Path
 from crate.client import connect

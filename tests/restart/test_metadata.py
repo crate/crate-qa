@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import unittest
-import os
 from crate.client import connect
 from crate.qa.tests import NodeProvider
+
 
 class MetadataTestCase(NodeProvider, unittest.TestCase):
 
