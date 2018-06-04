@@ -15,9 +15,7 @@ def randbool():
     return True if random.getrandbits(1) else False
 
 
-
 class StartupTest(NodeProvider, unittest.TestCase):
-
     fake = Faker(random.choice(list(AVAILABLE_LOCALES)))
 
     def assert_mqtt_port(self, predicate):
@@ -160,50 +158,49 @@ class StartupTest(NodeProvider, unittest.TestCase):
         tmp_home = self.mkdtemp()
         Path(tmp_home, 'config').mkdir()
 
-        nodeName = self.fake.last_name()
+        node_name = self.fake.last_name()
         settings = dict({
-            'node.name': nodeName,
+            'node.name': node_name,
             'path.home': tmp_home,
         })
 
-        logFilePath = Path(tmp_home, 'crate.log')
-        self.create_log_from_template(logFilePath, tmp_home)
+        log_file_path = Path(tmp_home, 'crate.log')
+        self.create_log_from_template(log_file_path, tmp_home)
 
-        (node, version_tuple)= self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
         # Check entries in log file
-        def verifyAndExtractContentFromLogLine(logLine):
-            self.assertTrue(' [' + nodeName + '] ' in logLine, 'line does not contain correct node name')
+        def verify_and_extract_content_from_log_line(log_line):
+            self.assertTrue(' [' + node_name + '] ' in log_line, 'line does not contain correct node name')
             if '[o.e.n.Node               ]' in line:
-                return logLine.split(' [' + nodeName + '] ')[1]
+                return log_line.split(' [' + node_name + '] ')[1]
             return None
 
-        with open(logFilePath, 'r') as f:
+        with open(log_file_path, 'r') as f:
             for lineIdx, line in enumerate(f):
-                lineCtx = verifyAndExtractContentFromLogLine(line)
-                if lineCtx:
+                line_ctx = verify_and_extract_content_from_log_line(line)
+                if line_ctx:
                     if lineIdx == 1:
-                        self.assertTrue('initializing', lineCtx)
+                        self.assertTrue('initializing', line_ctx)
                     elif lineIdx == 2:
-                        self.assertTrue(re.match(r'node name \[' + nodeName + '\], node ID \[.+\]', lineCtx))
+                        self.assertTrue(re.match(r'node name \[' + node_name + '\], node ID \[.+\]', line_ctx))
                     elif lineIdx == 3:
                         version_str = '.'.join([str(v) for v in version_tuple])
-                        self.assertTrue(re.match(
-                            r'CrateDB version\[' + version_str + '-SNAPSHOT\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]',
-                        lineCtx))
+                        self.assertTrue(re.match(r'CrateDB version\[' + version_str + '-SNAPSHOT\], ' +
+                                                 'pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]',
+                                                 line_ctx))
                     elif lineIdx == 4:
-                        self.assertTrue(re.match(r'JVM arguments \[.+\]', lineCtx))
+                        self.assertTrue(re.match(r'JVM arguments \[.+\]', line_ctx))
                     elif lineIdx == 5:
-                        self.assertTrue('initialized', lineCtx)
+                        self.assertTrue('initialized', line_ctx)
                     elif lineIdx == 6:
-                        self.assertTrue('starting ...', lineCtx)
+                        self.assertTrue('starting ...', line_ctx)
                     elif lineIdx == 7:
-                        self.assertTrue('started', lineCtx)
+                        self.assertTrue('started', line_ctx)
 
     @staticmethod
     def create_log_from_template(log_file_path, tmp_home):
-        # Copy log4j2.properties and replace path to crate.log output file
         with open(Path(Path(__file__).parent, "log4j2_file.properties"), "r") as fin, \
              open(Path(tmp_home, "config", "log4j2.properties"), "w") as fout:
             for line in fin:
