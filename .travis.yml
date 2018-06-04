@@ -16,7 +16,7 @@ before_install:
 
 install:
   - pip install --upgrade -e .
-  - pip install crash mypy
+  - pip install crash mypy flake8
 
 script:
   - tests/client_tests/go/run.sh
@@ -24,6 +24,7 @@ script:
   - tests/client_tests/haskell/run.sh
   - find tests -name "*.py" | xargs mypy --ignore-missing-imports
   - find src -name "*.py" | xargs mypy --ignore-missing-imports
+  - flake8 src/ tests/
   - cd tests && python -m unittest -vvv $(find . -name "test_*.py" | grep -v test_upgrade.py | xargs readlink -f)
 
 env:
