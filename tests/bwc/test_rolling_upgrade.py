@@ -1,8 +1,7 @@
 import unittest
 from typing import NamedTuple
 from crate.client import connect
-from crate.qa.tests import VersionDef, NodeProvider, \
-    insert_data, wait_for_active_shards
+from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards
 
 
 class UpgradePath(NamedTuple):
@@ -14,7 +13,7 @@ class UpgradePath(NamedTuple):
 
 
 ROLLING_UPGRADES = (
-    UpgradePath('3.0.x', 'latest-nightly'),
+    UpgradePath('3.0.0', '3.0.x'),
     UpgradePath('2.3.0', '2.3.x'),
 )
 
