@@ -11,3 +11,9 @@ create table doc.pg_type (
 
 insert into doc.pg_type (oid, typdelim, typelem, typname, typtype)
     (select oid, typdelim, typelem, typname, typtype from pg_catalog.pg_type);
+
+CREATE TABLE doc.users (
+  id LONG,
+  name STRING,
+  value FLOAT
+)
