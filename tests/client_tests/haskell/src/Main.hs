@@ -1,8 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
+import           Control.Exception.Base   (finally)
 import           Control.Monad            (forM_)
+import qualified Data.ByteString.Char8    as BS
 import qualified Database.HDBC            as DB
 import           Database.HDBC.PostgreSQL (connectPostgreSQL)
+import qualified Hasql.Connection         as Hasql
+import qualified Hasql.Decoders           as Decoders
+import qualified Hasql.Encoders           as Encoders
+import qualified Hasql.Query              as Hasql
+import qualified Hasql.Session            as Hasql
 import           System.Environment       (getArgs)
 import           Text.Printf              (printf)
 
@@ -10,15 +19,15 @@ import           Text.Printf              (printf)
 expectedRows :: [[DB.SqlValue]]
 expectedRows = map (\i -> [DB.SqlInt32 i]) [1..10]
 
-main :: IO ()
-main = do
-  [host, port] <- getArgs
+
+runQueriesWithHDBC :: String -> String -> IO ()
+runQueriesWithHDBC host port = do
   let
     dbUri = printf "host=%s dbname=doc user=crate port=%s" host port
   conn <- connectPostgreSQL dbUri
   DB.runRaw conn "drop table if exists t1"
   DB.runRaw conn "create table t1 (x int)"
-  insertStmt <- DB.prepare conn "insert into t1 (x) values (?)" 
+  insertStmt <- DB.prepare conn "insert into t1 (x) values (?)"
   DB.execute insertStmt [DB.SqlInt32 100]
   DB.executeMany insertStmt (map (\i -> [DB.SqlInt32 i]) [1..10])
   DB.runRaw conn "refresh table t1"
@@ -28,3 +37,47 @@ main = do
   if rows /= expectedRows
     then fail "rows didn't match expected result"
     else forM_ rows print
+
+
+runQueriesWithHasqlConn :: Hasql.Connection -> IO ()
+runQueriesWithHasqlConn conn = do
+  run (Hasql.sql "drop table if exists t1")
+  run (Hasql.sql "create table t1 (x int)")
+  rowCount <- run (Hasql.query 10 insert)
+  print rowCount
+  run (Hasql.sql "refresh table t1")
+  rows <- run (Hasql.query () select)
+  forM_ rows print
+  where
+    run = getRight <$> flip Hasql.run conn
+    getRight f = do
+      result <- f
+      case result of
+        Left err -> error $ show err
+        Right val -> pure val
+    insert = Hasql.statement 
+      "insert into t1 (x) values ($1)" singleInt Decoders.rowsAffected True
+    singleInt = Encoders.value Encoders.int4
+    rowsWithX = Decoders.rowsList $ Decoders.value Decoders.int4
+    select = Hasql.statement "select x from t1" Encoders.unit rowsWithX True
+
+
+runQueriesWithHasql :: String -> String -> IO ()
+runQueriesWithHasql host port = do
+  errorOrConn <- Hasql.acquire settings
+  case errorOrConn of
+    Left err -> error $ show err
+    Right conn ->
+      runQueriesWithHasqlConn conn `finally` Hasql.release conn
+  where
+    settings = Hasql.settings (BS.pack host) (read port) user pw db
+    user = "crate"
+    pw = ""
+    db = "hasql"
+
+
+main :: IO ()
+main = do
+  [host, port] <- getArgs
+  runQueriesWithHDBC host port
+  runQueriesWithHasql host port
