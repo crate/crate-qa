@@ -98,6 +98,7 @@ SELECT_STATEMENTS = (
     Statement('SELECT * FROM t1 WHERE within(col_geo_point, col_geo_shape)', []),
     Statement('SELECT date_trunc(\'week\', col_timestamp), sum(col_int), avg(col_float) FROM t1 GROUP BY 1', []),
     Statement('SELECT _score, text FROM t1 WHERE match(text_ft, \'fase\')', []),
+    Statement('UPDATE t1 SET col_int = col_int + 1', []),
 )
 
 
