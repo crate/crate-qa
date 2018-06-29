@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx"
 	"log"
+	"time"
 )
 
 func main() {
@@ -29,13 +30,13 @@ func main() {
 		return
 	}
 	fmt.Println(name)
-	commandTag, err := conn.Exec("create table t1 (x int)")
+	commandTag, err := conn.Exec("create table t1 (x integer, ts timestamp)")
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	fmt.Println(commandTag)
-	commandTag, err = conn.Exec("insert into t1 (x) values (1)")
+	commandTag, err = conn.Exec("insert into t1 (x, ts) values (?, ?)", 1, time.Now())
 	if err != nil {
 		log.Fatal(err)
 		return
