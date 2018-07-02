@@ -170,8 +170,22 @@ class StartupTest(NodeProvider, unittest.TestCase):
         (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
+        def is_whitelisted_log(logline):
+            whitelisted_logs = [
+                "[i.n.u.i.PlatformDependent] Your platform does not provide "
+                "complete low-level API for accessing direct buffers reliably. "
+                "Unless explicitly requested, heap buffer will always be "
+                "preferred to avoid potential system instability."
+            ]
+            for whitelisted in whitelisted_logs:
+                if whitelisted in logline:
+                    return True
+
         # Check entries in log file
         def verify_and_extract_content_from_log_line(log_line):
+            if is_whitelisted_log(log_line):
+                return None
+
             self.assertTrue(' [' + node_name + '] ' in log_line, 'line does not contain correct node name')
             if '[o.e.n.Node               ]' in line:
                 return log_line.split(' [' + node_name + '] ')[1]
@@ -180,6 +194,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
         with open(log_file_path, 'r') as f:
             for lineIdx, line in enumerate(f):
                 line_ctx = verify_and_extract_content_from_log_line(line)
+
                 if line_ctx:
                     if lineIdx == 1:
                         self.assertTrue('initializing', line_ctx)
