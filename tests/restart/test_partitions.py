@@ -85,7 +85,7 @@ class PartitionTestCase(NodeProvider, unittest.TestCase):
             cursor = conn.cursor()
             wait_for_active_shards(cursor)
             cursor.execute("""
-            SELECT id, date_trunc('day', ts) = day__generated FROM parted_table
+            SELECT id, date_trunc('day', ts) = day__generated FROM parted_table order by 1
             """)
             for idx, result in enumerate(cursor.fetchall()):
                 self.assertEqual(result[0], idx)
