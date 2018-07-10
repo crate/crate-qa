@@ -10,7 +10,7 @@ import           Database.HDBC.PostgreSQL (connectPostgreSQL)
 import qualified Hasql.Connection         as Hasql
 import qualified Hasql.Decoders           as Decoders
 import qualified Hasql.Encoders           as Encoders
-import qualified Hasql.Query              as Hasql
+import qualified Hasql.Statement          as Hasql
 import qualified Hasql.Session            as Hasql
 import           System.Environment       (getArgs)
 import           Text.Printf              (printf)
@@ -43,10 +43,10 @@ runQueriesWithHasqlConn :: Hasql.Connection -> IO ()
 runQueriesWithHasqlConn conn = do
   run (Hasql.sql "drop table if exists t1")
   run (Hasql.sql "create table t1 (x int)")
-  rowCount <- run (Hasql.query 10 insert)
+  rowCount <- run (Hasql.statement 10 insert)
   print rowCount
   run (Hasql.sql "refresh table t1")
-  rows <- run (Hasql.query () select)
+  rows <- run (Hasql.statement () select)
   forM_ rows print
   where
     run = getRight <$> flip Hasql.run conn
@@ -55,11 +55,11 @@ runQueriesWithHasqlConn conn = do
       case result of
         Left err -> error $ show err
         Right val -> pure val
-    insert = Hasql.statement 
+    insert = Hasql.Statement 
       "insert into t1 (x) values ($1)" singleInt Decoders.rowsAffected True
-    singleInt = Encoders.value Encoders.int4
-    rowsWithX = Decoders.rowsList $ Decoders.value Decoders.int4
-    select = Hasql.statement "select x from t1" Encoders.unit rowsWithX True
+    singleInt = Encoders.param Encoders.int4
+    rowsWithX = Decoders.rowList $ Decoders.column Decoders.int4
+    select = Hasql.Statement "select x from t1" Encoders.unit rowsWithX True
 
 
 runQueriesWithHasql :: String -> String -> IO ()
