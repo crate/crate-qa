@@ -1,3 +1,5 @@
+import os
+import shutil
 import unittest
 import time
 from typing import NamedTuple, Iterable
@@ -288,3 +290,66 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                              cursor.fetchall())
 
             self._process_on_stop()
+
+
+class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
+    CLUSTER_ID = gen_id()
+
+    CLUSTER_SETTINGS = {
+        'cluster.name': CLUSTER_ID,
+        'es.api.enabled': 'true'
+    }
+
+    SUPPORTED_VERSIONS = (
+        '1.1.x',
+        'latest-nightly',
+    )
+
+    def test_metadata_compatibility(self):
+        nodes = 3
+
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute("select 1")
+        self._process_on_stop()
+
+        for version in self.SUPPORTED_VERSIONS[1:]:
+            self.assert_dynamic_string_detection(version, nodes)
+
+    def assert_dynamic_string_detection(self, version, nodes):
+        """ Test that a dynamic string column detection works as expected.
+
+        If the cluster was initially created/started with a lower CrateDB
+        version, we must ensure that our default template is also upgraded, if
+        needed, because it is persisted in the cluster state. That's why
+        re-creating tables would not help.
+        """
+        self._move_nodes_folder_if_needed()
+        cluster = self._new_cluster(version,
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute('CREATE TABLE t1 (o object)')
+            cursor.execute('''INSERT INTO t1 (o) VALUES ({"name" = 'foo'})''')
+            self.assertEqual(cursor.rowcount, 1)
+            cursor.execute('REFRESH TABLE t1')
+            cursor.execute("SELECT o['name'], count(*) FROM t1 GROUP BY 1")
+            rs = cursor.fetchall()
+            self.assertEqual(['foo', 1], rs[0])
+            cursor.execute('DROP TABLE t1')
+            self._process_on_stop()
+
+    def _move_nodes_folder_if_needed(self):
+        """Eliminates the cluster-id folder inside the data directory."""
+        data_path_incl_cluster_id = os.path.join(self._path_data, self.CLUSTER_ID)
+        if os.path.exists(data_path_incl_cluster_id):
+            src_path_nodes = os.path.join(data_path_incl_cluster_id, 'nodes')
+            target_path_nodes = os.path.join(self._path_data, 'nodes')
+            shutil.move(src_path_nodes, target_path_nodes)
+            shutil.rmtree(data_path_incl_cluster_id)
