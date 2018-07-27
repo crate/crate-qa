@@ -27,8 +27,7 @@ UPGRADE_PATHS = (
         VersionDef('2.1.x', False),
         VersionDef('2.2.x', False),
         VersionDef('2.3.x', True),
-        VersionDef('3.0.x', False),
-        VersionDef('latest-nightly', False),
+        VersionDef('3.0.3', False),
     ),
 )
 
