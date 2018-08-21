@@ -32,7 +32,8 @@ setup(
     install_requires=[
         'cr8',
         'Cython',
-        'asyncpg'
+        'asyncpg',
+        'Faker==0.8.18'
     ],
     python_requires='>=3.6',
     classifiers=[
