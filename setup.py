@@ -33,7 +33,8 @@ setup(
         'cr8',
         'Cython',
         'asyncpg',
-        'Faker==0.8.18'
+        'Faker==0.8.18',
+        'pyodbc'
     ],
     python_requires='>=3.6',
     classifiers=[

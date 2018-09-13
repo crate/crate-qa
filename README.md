@@ -23,6 +23,36 @@ source env/bin/activate
 pip install --upgrade -e .
 ```
 
+### ODBC Library Installation
+
+To successfully run the `client_tests/odbc` tests, the `postgresql odbc` (and its dependency `unixodbc`)
+library must be installed first.
+
+### MacOS
+
+Recommended way is to use [brew] or [macports] for installation.
+
+`brew install psqlodbc`
+
+or
+
+`sudo port install psqlodbc`
+
+### Linux
+
+Use the package manager of your distribution of choice for installation.
+
+Examples:
+
+Apt:
+
+`apt-get install odbc-postgresql`
+
+Yum:
+
+`yum install postgresql-odbc`
+
+
 ## Test Suites
 
 * `startup/`: test CrateDB startup with critical settings provided by CLI and crate.yml
@@ -48,3 +78,6 @@ Run a specific test method (e.g. `restart.test_query_partitioned_table`)
 ```bash
 $ python3.6 -m unittest -v restart.test_partitions.PartitionTestCase.test_query_partitioned_table
 ```
+
+[brew]: https://brew.sh/
+[macports]: https://www.macports.org/
