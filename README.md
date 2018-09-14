@@ -46,11 +46,11 @@ Examples:
 
 Apt:
 
-`apt-get install odbc-postgresql`
+`apt-get install odbc-postgresql unixodbc-dev`
 
 Yum:
 
-`yum install postgresql-odbc`
+`yum install postgresql-odbc unixODBC-devel`
 
 
 ## Test Suites
