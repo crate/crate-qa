@@ -38,29 +38,24 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
                 self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("INSERT INTO t1(id) VALUES(?)", 1)
-                self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("REFRESH TABLE t1")
 
                 cursor.execute("UPDATE t1 SET x = ?", 2)
-                self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("REFRESH TABLE t1")
 
                 cursor.execute("DELETE FROM t1 WHERE x = ?", 2)
-                self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("REFRESH TABLE t1")
 
                 cursor.execute("INSERT INTO t1 (id) (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)", 1)
-                self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("REFRESH TABLE t1")
 
                 cursor.execute("INSERT INTO t1 (id)"
                                " (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)"
                                " ON DUPLICATE KEY UPDATE x = ?", 1, 3)
-                self.assertEqual(cursor.rowcount, 1)
 
                 cursor.execute("REFRESH TABLE t1")
 
