@@ -13,8 +13,7 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
         (node, _) = self._new_node(self.CRATE_VERSION)
         node.start()
 
-        # TODO: replace with 'doc' once search_path implicitly includes 'pg_catalog'
-        database = 'pg_catalog'
+        database = 'doc'
         user = 'crate'
         host = node.addresses.psql.host
         port = node.addresses.psql.port
@@ -29,10 +28,6 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
                 cursor.execute("SELECT name FROM sys.cluster")
                 row = cursor.fetchone()
                 self.assertIsNotNone(row)
-
-                # TODO: remove after search_path is fully implemented with default 'doc'
-                # switch search_path to 'doc'
-                cursor.execute("SET search_path='doc'")
 
                 cursor.execute("CREATE TABLE t1 (id INTEGER PRIMARY KEY, x INTEGER)")
                 self.assertEqual(cursor.rowcount, 1)
