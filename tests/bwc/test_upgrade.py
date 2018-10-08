@@ -11,18 +11,6 @@ from crate.qa.tests import VersionDef, NodeProvider, \
 
 UPGRADE_PATHS = (
     (
-        VersionDef('0.54.x', False),
-        VersionDef('0.55.x', False),
-        VersionDef('0.56.x', False),
-        VersionDef('0.57.x', False),
-        VersionDef('1.0.x', False),
-        VersionDef('1.1.x', True),
-        VersionDef('2.0.x', False),
-        VersionDef('2.1.x', False),
-        VersionDef('2.2.x', False),
-        VersionDef('2.3.x', False),
-    ),
-    (
         VersionDef('2.0.x', False),
         VersionDef('2.1.x', False),
         VersionDef('2.2.x', False),
