@@ -343,3 +343,61 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             target_path_nodes = os.path.join(self._path_data, 'nodes')
             shutil.move(src_path_nodes, target_path_nodes)
             shutil.rmtree(data_path_incl_cluster_id)
+
+
+class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
+
+    CLUSTER_SETTINGS = {
+        'cluster.name': gen_id(),
+    }
+
+    SUPPORTED_VERSIONS = (
+        '2.3.x',
+        'latest-nightly',
+    )
+
+    def test_altering_tables_with_old_settings(self):
+        """ Test that the settings of tables created with an old not anymore supported setting can still be changed
+        when running with the latest version.
+        This test ensures that old settings are removed on upgrade or at latest when changing some table settings.
+        Before 3.1.2, purging old settings was not done correctly and thus altering settings of such tables failed.
+        """
+
+        nodes = 3
+
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+
+            # The used setting is only valid until version 2.3.x
+            cursor.execute('''
+                CREATE TABLE t1 (id int) with ("recovery.initial_shards"=1);
+            ''')
+            cursor.execute('''
+                CREATE TABLE p1 (id int, p int) partitioned by (p) with ("recovery.initial_shards"=1);
+            ''')
+            cursor.execute('''
+                INSERT INTO p1 (id, p) VALUES (1, 1);
+            ''')
+        self._process_on_stop()
+
+        for version in self.SUPPORTED_VERSIONS[1:]:
+            self.start_cluster_and_alter_tables(version, nodes)
+
+    def start_cluster_and_alter_tables(self, version, nodes):
+        cluster = self._new_cluster(version,
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                ALTER TABLE t1 SET (number_of_replicas=0)
+            ''')
+            cursor.execute('''
+                ALTER TABLE p1 SET (number_of_replicas=0)
+            ''')
+            self._process_on_stop()
