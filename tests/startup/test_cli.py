@@ -184,14 +184,16 @@ class StartupTest(NodeProvider, unittest.TestCase):
                     if lineIdx == 1:
                         self.assertTrue('initializing', line_ctx)
                     elif lineIdx == 2:
-                        self.assertTrue(re.match(r'node name \[' + node_name + '\], node ID \[.+\]', line_ctx))
+                        self.assertTrue(re.match(
+                            r'node name [' + node_name + '], node ID [.+]', line_ctx))
                     elif lineIdx == 3:
                         version_str = '.'.join([str(v) for v in version_tuple])
-                        self.assertTrue(re.match(r'CrateDB version\[' + version_str + '-SNAPSHOT\], ' +
-                                                 'pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]',
-                                                 line_ctx))
+                        self.assertTrue(re.match(
+                            (r'CrateDB version[' + version_str + '-SNAPSHOT], '
+                             r'pid[\d+], build[.+], OS[.+], JVM[.+]'),
+                            line_ctx))
                     elif lineIdx == 4:
-                        self.assertTrue(re.match(r'JVM arguments \[.+\]', line_ctx))
+                        self.assertTrue(re.match(r'JVM arguments [.+]', line_ctx))
                     elif lineIdx == 5:
                         self.assertTrue('initialized', line_ctx)
                     elif lineIdx == 6:
