@@ -291,7 +291,7 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        '1.1.x',
+        '2.1.x',
         'latest-nightly',
     )
 
