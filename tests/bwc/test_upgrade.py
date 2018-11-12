@@ -374,10 +374,10 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
 
             # The used setting is only valid until version 2.3.x
             cursor.execute('''
-                CREATE TABLE t1 (id int) with ("recovery.initial_shards"=1);
+                CREATE TABLE t1 (id int) clustered into 4 shards with ("recovery.initial_shards"=1);
             ''')
             cursor.execute('''
-                CREATE TABLE p1 (id int, p int) partitioned by (p) with ("recovery.initial_shards"=1);
+                CREATE TABLE p1 (id int, p int) clustered into 4 shards partitioned by (p) with ("recovery.initial_shards"=1);
             ''')
             cursor.execute('''
                 INSERT INTO p1 (id, p) VALUES (1, 1);
@@ -394,10 +394,11 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
+            wait_for_active_shards(cursor, 8)
             cursor.execute('''
                 ALTER TABLE t1 SET (number_of_replicas=0)
             ''')
             cursor.execute('''
                 ALTER TABLE p1 SET (number_of_replicas=0)
             ''')
-            self._process_on_stop()
+        self._process_on_stop()
