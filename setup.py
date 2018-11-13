@@ -33,7 +33,8 @@ setup(
         'cr8>=0.14.0',
         'Cython',
         'asyncpg>=0.18.2',
-        'pyodbc'
+        'pyodbc',
+        'psycopg2-binary==2.7.5'
     ],
     python_requires='>=3.6',
     classifiers=[
