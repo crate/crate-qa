@@ -2,18 +2,19 @@
 
 module Main where
 
-import           Control.Exception.Base   (finally)
-import           Control.Monad            (forM_)
-import qualified Data.ByteString.Char8    as BS
-import qualified Database.HDBC            as DB
-import           Database.HDBC.PostgreSQL (connectPostgreSQL)
-import qualified Hasql.Connection         as Hasql
-import qualified Hasql.Decoders           as Decoders
-import qualified Hasql.Encoders           as Encoders
-import qualified Hasql.Statement          as Hasql
-import qualified Hasql.Session            as Hasql
-import           System.Environment       (getArgs)
-import           Text.Printf              (printf)
+import           Control.Exception.Base     (finally)
+import           Control.Monad              (forM_)
+import qualified Data.ByteString.Char8      as BS
+import           Data.Functor.Contravariant (contramap)
+import qualified Database.HDBC              as DB
+import           Database.HDBC.PostgreSQL   (connectPostgreSQL)
+import qualified Hasql.Connection           as Hasql
+import qualified Hasql.Decoders             as Decoders
+import qualified Hasql.Encoders             as Encoders
+import qualified Hasql.Session              as Hasql
+import qualified Hasql.Statement            as Hasql
+import           System.Environment         (getArgs)
+import           Text.Printf                (printf)
 
 
 expectedRows :: [[DB.SqlValue]]
@@ -42,8 +43,8 @@ runQueriesWithHDBC host port = do
 runQueriesWithHasqlConn :: Hasql.Connection -> IO ()
 runQueriesWithHasqlConn conn = do
   run (Hasql.sql "drop table if exists t1")
-  run (Hasql.sql "create table t1 (x int)")
-  rowCount <- run (Hasql.statement 10 insert)
+  run (Hasql.sql "create table t1 (x int, name string)")
+  rowCount <- run (Hasql.statement (10, "foo") insert)
   print rowCount
   run (Hasql.sql "refresh table t1")
   rows <- run (Hasql.statement () select)
@@ -56,10 +57,13 @@ runQueriesWithHasqlConn conn = do
         Left err -> error $ show err
         Right val -> pure val
     insert = Hasql.Statement 
-      "insert into t1 (x) values ($1)" singleInt Decoders.rowsAffected True
-    singleInt = Encoders.param Encoders.int4
-    rowsWithX = Decoders.rowList $ Decoders.column Decoders.int4
-    select = Hasql.Statement "select x from t1" Encoders.unit rowsWithX True
+      "insert into t1 (x, name) values ($1, $2)" insertParams Decoders.rowsAffected True
+    insertParams = 
+      contramap fst (Encoders.param Encoders.int4) <>
+      contramap snd (Encoders.param Encoders.text)
+    intAndTextTuple = Decoders.rowList $ 
+      (,) <$> Decoders.column Decoders.int4 <*> Decoders.column Decoders.text
+    select = Hasql.Statement "select x, name from t1" Encoders.unit intAndTextTuple True
 
 
 runQueriesWithHasql :: String -> String -> IO ()

@@ -17,3 +17,4 @@ executable crate-qa-hask
                      , HDBC-postgresql
                      , hasql
                      , bytestring
+                     , contravariant
