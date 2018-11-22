@@ -382,6 +382,7 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute('''
                 INSERT INTO p1 (id, p) VALUES (1, 1);
             ''')
+            wait_for_active_shards(cursor, 8)
         self._process_on_stop()
 
         for version in self.SUPPORTED_VERSIONS[1:]:
