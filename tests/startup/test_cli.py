@@ -1,5 +1,4 @@
 import os
-import re
 import socket
 import unittest
 from pathlib import Path
@@ -172,7 +171,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
 
         # Check entries in log file
         def verify_and_extract_content_from_log_line(log_line):
-            self.assertTrue(' [' + node_name + '] ' in log_line, 'line does not contain correct node name')
+            self.assertIn(' [' + node_name + '] ', log_line)
             if '[o.e.n.Node               ]' in line:
                 return log_line.split(' [' + node_name + '] ')[1]
             return None
@@ -180,26 +179,27 @@ class StartupTest(NodeProvider, unittest.TestCase):
         with open(log_file_path, 'r') as f:
             for lineIdx, line in enumerate(f):
                 line_ctx = verify_and_extract_content_from_log_line(line)
-                if line_ctx:
-                    if lineIdx == 1:
-                        self.assertTrue('initializing', line_ctx)
-                    elif lineIdx == 2:
-                        self.assertTrue(re.match(
-                            r'node name [' + node_name + '], node ID [.+]', line_ctx))
-                    elif lineIdx == 3:
-                        version_str = '.'.join([str(v) for v in version_tuple])
-                        self.assertTrue(re.match(
-                            (r'CrateDB version[' + version_str + '-SNAPSHOT], '
-                             r'pid[\d+], build[.+], OS[.+], JVM[.+]'),
-                            line_ctx))
-                    elif lineIdx == 4:
-                        self.assertTrue(re.match(r'JVM arguments [.+]', line_ctx))
-                    elif lineIdx == 5:
-                        self.assertTrue('initialized', line_ctx)
-                    elif lineIdx == 6:
-                        self.assertTrue('starting ...', line_ctx)
-                    elif lineIdx == 7:
-                        self.assertTrue('started', line_ctx)
+                if not line_ctx:
+                    continue
+                if lineIdx == 1:
+                    self.assertTrue('initializing', line_ctx)
+                elif lineIdx == 2:
+                    self.assertRegex(
+                        line_ctx,
+                        rf'node name \[{node_name}\], node ID \[.+\]\n')
+                elif lineIdx == 3:
+                    version_str = '.'.join([str(v) for v in version_tuple])
+                    self.assertRegex(
+                        line_ctx,
+                        rf'version\[{version_str}-SNAPSHOT\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]')
+                elif lineIdx == 4:
+                    self.assertRegex(line_ctx, r'JVM arguments \[.+\]')
+                elif lineIdx == 5:
+                    self.assertTrue('initialized', line_ctx)
+                elif lineIdx == 6:
+                    self.assertTrue('starting ...', line_ctx)
+                elif lineIdx == 7:
+                    self.assertTrue('started', line_ctx)
 
     @staticmethod
     def create_log_from_template(log_file_path, tmp_home):
