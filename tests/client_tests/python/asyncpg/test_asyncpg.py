@@ -41,6 +41,20 @@ async def exec_queries(test, hosts):
         test.assertEqual(result, 'INSERT 0 1')
 
 
+async def fetch_summits(test, host, port):
+    conn = await asyncpg.connect(
+        host=host, port=port, user='crate', database='doc')
+    async with conn.transaction():
+        cur = await conn.cursor(
+            'select mountain from sys.summits order by height desc')
+        first, second = await cur.fetch(2)
+        third, fourth = await cur.fetch(2)
+    test.assertEqual(first['mountain'], 'Mont Blanc')
+    test.assertEqual(second['mountain'], 'Monte Rosa')
+    test.assertEqual(third['mountain'], 'Dom')
+    test.assertEqual(fourth['mountain'], 'Liskamm')
+
+
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):
 
     def test_basic_statements(self):
@@ -50,3 +64,11 @@ class AsyncpgTestCase(NodeProvider, unittest.TestCase):
         psql_addr = node.addresses.psql
         crate_psql_url = f'{psql_addr.host}:{psql_addr.port}'
         loop.run_until_complete(exec_queries(self, crate_psql_url))
+
+    def test_result_streaming_using_fetch_size(self):
+        (node, _) = self._new_node(self.CRATE_VERSION)
+        node.start()
+        loop = asyncio.get_event_loop()
+        psql_addr = node.addresses.psql
+        loop.run_until_complete(
+            fetch_summits(self, psql_addr.host, psql_addr.port))
