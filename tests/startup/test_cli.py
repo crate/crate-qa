@@ -191,7 +191,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
                     version_str = '.'.join([str(v) for v in version_tuple])
                     self.assertRegex(
                         line_ctx,
-                        rf'version\[{version_str}-SNAPSHOT\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]')
+                        rf'version\[{version_str}(-SNAPSHOT)?\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]')
                 elif lineIdx == 4:
                     self.assertRegex(line_ctx, r'JVM arguments \[.+\]')
                 elif lineIdx == 5:
