@@ -79,5 +79,12 @@ Run a specific test method (e.g. `restart.test_query_partitioned_table`)
 $ python3.6 -m unittest -v restart.test_partitions.PartitionTestCase.test_query_partitioned_table
 ```
 
+## Help
+
+Looking for more help?
+
+- Check out our [support channels]
+
 [brew]: https://brew.sh/
 [macports]: https://www.macports.org/
+[support channels]: https://crate.io/support/
