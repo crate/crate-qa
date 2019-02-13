@@ -2,6 +2,7 @@ import os
 import shutil
 import unittest
 import time
+from uuid import uuid4
 from typing import NamedTuple, Iterable
 from io import BytesIO
 from crate.client import connect
@@ -17,11 +18,19 @@ UPGRADE_PATHS = (
         VersionDef('2.3.x', True),
         VersionDef('3.0.x', False),
         VersionDef('3.1.x', False),
-        VersionDef('3.1', False),
         VersionDef('3.2.x', False),
+        VersionDef('3.2', False),
         VersionDef('latest-nightly', False),
     ),
 )
+
+CREATE_PARTED_TABLE = '''
+CREATE TABLE parted (
+    id string primary key,
+    version string primary key,
+    cols object (dynamic)
+) PARTITIONED BY (version) CLUSTERED INTO 1 SHARDS
+'''
 
 
 CREATE_DOC_TABLE = '''
@@ -176,6 +185,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             c = conn.cursor()
             c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
+            c.execute(CREATE_PARTED_TABLE)
             c.execute('''
                 INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
             ''')
@@ -199,13 +209,23 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
-            wait_for_active_shards(cursor, 6)
+            wait_for_active_shards(cursor, 0)
             self._upgrade(cursor, upgrade_segments)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
             run_selects(cursor, version)
             container = conn.get_blob_container('b1')
             container.get(digest)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
+
+            # older versions had a bug that caused this to fail
+            if version in ('latest-nightly', '3.2'):
+                # Test that partition and dynamic columns can be created
+                obj = {"t_" + version.replace('.', '_'): True}
+                args = (str(uuid4()), version, obj)
+                cursor.execute(
+                    'INSERT INTO doc.parted (id, version, cols) values (?, ?, ?)',
+                    args
+                )
         self._process_on_stop()
 
 
