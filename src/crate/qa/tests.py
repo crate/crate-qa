@@ -10,9 +10,10 @@ from unittest.case import _Outcome
 from pprint import pformat
 from threading import Thread
 from collections import OrderedDict
-from typing import Dict, Any, NamedTuple
+from typing import Dict, Any, NamedTuple, Iterable
 from distutils.version import StrictVersion as V
 from faker.generator import random
+from glob import glob
 from cr8.run_crate import CrateNode, LineBuffer, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
@@ -22,6 +23,18 @@ CRATEDB_0_57 = V('0.57.0')
 
 
 print_error = functools.partial(print, file=sys.stderr)
+
+
+JDK_8_JAVA_HOME_CANDIDATES = (
+    '/usr/lib/jvm/java-8-openjdk',
+    '/usr/lib/java-1.8.0',
+) + tuple(glob('/Library/Java/JavaVirtualMachines/jdk*1.8*/Contents/Home'))
+
+
+def prepare_env(java_home_candidates: Iterable[str]) -> dict:
+    for candidate in filter(os.path.exists, java_home_candidates):
+        return {'JAVA_HOME': candidate}
+    return {}
 
 
 def gen_id() -> str:
@@ -101,6 +114,7 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
 class VersionDef(NamedTuple):
     version: str
     upgrade_segments: bool
+    java_home: Iterable[str]
 
 
 class CrateCluster:
@@ -158,8 +172,9 @@ class NodeProvider:
             for x in range(num)
         ])
 
-    def _new_cluster(self, version, num_nodes, settings={}):
+    def _new_cluster(self, version, num_nodes, settings=None, env=None):
         self.assertTrue(hasattr(self, '_new_node'))
+        settings = settings or {}
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
             self.assertFalse(port in settings)
         s = {
@@ -174,7 +189,7 @@ class NodeProvider:
         nodes = []
         for id in range(num_nodes):
             s['node.name'] = s['cluster.name'] + '-' + str(id)
-            nodes.append(self._new_node(version, s)[0])
+            nodes.append(self._new_node(version, s, env)[0])
         return CrateCluster(nodes)
 
     def upgrade_node(self, old_node, new_version):
@@ -189,7 +204,7 @@ class NodeProvider:
         self._on_stop = []
         self._log_consumers = []
 
-        def new_node(version, settings={}):
+        def new_node(version, settings=None, env=None):
             crate_dir = get_crate(version)
             version_tuple = _extract_version(crate_dir)
             v = version_tuple_to_strict_version(version_tuple)
@@ -197,12 +212,13 @@ class NodeProvider:
                 'path.data': self._path_data,
                 'cluster.name': 'crate-qa',
             }
-            s.update(settings)
+            s.update(settings or {})
             s.update(test_settings(v))
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
                 'CRATE_HOME': crate_dir,
             }
+            e.update(env or {})
 
             if self.DEBUG:
                 print(f'# Running CrateDB {version} ({v}) ...')

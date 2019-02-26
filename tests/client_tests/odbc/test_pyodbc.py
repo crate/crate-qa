@@ -34,7 +34,6 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
         return f'DRIVER={driver_name};SERVER={host};PORT={port};DATABASE={database};USERNAME={user}'
 
     def tearDown(self):
-
         super().tearDown()
 
     def test_basic_statements(self):
@@ -69,7 +68,7 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
 
             cursor.execute("INSERT INTO t1 (id)"
                            " (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)"
-                           " ON DUPLICATE KEY UPDATE x = ?", 1, 3)
+                           " ON CONFLICT (id) DO UPDATE SET x = ?", 1, 3)
 
             cursor.execute("REFRESH TABLE t1")
 

@@ -86,38 +86,6 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
                         ['user_b', 'sys', 'DENY', 'DQL']]
             self.assertEqual(result, expected)
 
-    def test_ingestion_rules(self):
-        (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
-        node.start()
-        with connect(node.http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            CREATE TABLE mqtt_table (
-                client_id int PRIMARY KEY,
-                topic string,
-                payload object(ignored)
-            ) WITH (number_of_replicas=0)
-            """)
-            cursor.execute("""
-            CREATE INGEST RULE mqtt_table_rule
-            ON mqtt
-            WHERE topic like '%temperature%'
-            INTO mqtt_table
-            """)
-        node.stop()
-
-        node.start()
-        with connect(node.http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            SELECT rule_name, target_table, source_ident
-            FROM information_schema.ingestion_rules
-            ORDER BY rule_name
-            """)
-            result = cursor.fetchone()
-            expected = ['mqtt_table_rule', 'doc.mqtt_table', 'mqtt']
-            self.assertEqual(result, expected)
-
     def test_views(self):
         (node, _) = self._new_node(self.CRATE_VERSION, settings=self.CRATE_SETTINGS)
         node.start()

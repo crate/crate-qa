@@ -3,24 +3,38 @@ import shutil
 import unittest
 import time
 from uuid import uuid4
-from typing import NamedTuple, Iterable
+from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
-from crate.qa.tests import VersionDef, NodeProvider, \
-    wait_for_active_shards, insert_data, gen_id
+from crate.qa.tests import (
+    VersionDef,
+    NodeProvider,
+    wait_for_active_shards,
+    insert_data,
+    gen_id,
+    prepare_env,
+    JDK_8_JAVA_HOME_CANDIDATES
+)
+
 
 UPGRADE_PATHS = (
     (
-        VersionDef('2.0.x', False),
-        VersionDef('2.1.x', False),
-        VersionDef('2.2.x', False),
-        VersionDef('2.3.x', True),
-        VersionDef('3.0.x', False),
-        VersionDef('3.1.x', False),
-        VersionDef('3.2.x', False),
-        VersionDef('3.2', False),
-        VersionDef('latest-nightly', False),
+        VersionDef('2.0.x', False, JDK_8_JAVA_HOME_CANDIDATES),
+        VersionDef('2.1.x', False, JDK_8_JAVA_HOME_CANDIDATES),
+        VersionDef('2.2.x', False, JDK_8_JAVA_HOME_CANDIDATES),
+        VersionDef('2.3.x', True, []),
+        VersionDef('3.0.x', False, []),
+        VersionDef('3.1.x', False, []),
+        VersionDef('3.2.x', False, []),
+        VersionDef('3.2', False, []),
+        VersionDef('3.3', False, []),
+    ),
+    (
+        VersionDef('3.0.x', False, []),
+        VersionDef('3.1.x', False, []),
+        VersionDef('3.2.x', False, []),
+        VersionDef('latest-nightly', False, []),
     ),
 )
 
@@ -129,7 +143,7 @@ def path_repr(path):
 
         from_version -> to_version
     """
-    versions = [v for v, _ in path]
+    versions = [v.version for v in path]
     return f'{versions[0]} -> {versions[-1]}'
 
 
@@ -171,14 +185,17 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             else:
                 raise e
 
-    def _test_upgrade_path(self, versions, nodes):
+    def _test_upgrade_path(self, versions: Tuple[VersionDef], nodes):
         """ Test upgrade path across specified versions.
 
         Creates a blob and regular table in first version and inserts a record,
         then goes through all subsequent versions - each time verifying that a
         few simple selects work.
         """
-        cluster = self._new_cluster(versions[0][0], nodes, self.CLUSTER_SETTINGS)
+        version_def = versions[0]
+        env = prepare_env(version_def.java_home)
+        cluster = self._new_cluster(
+            version_def.version, nodes, self.CLUSTER_SETTINGS, env)
         cluster.start()
         digest = None
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -197,22 +214,24 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             container.get(digest)
         self._process_on_stop()
 
-        for version, upgrade_segments in versions[1:]:
-            self.assert_data_persistence(version, nodes, upgrade_segments, digest)
+        for version_def in versions[1:]:
+            self.assert_data_persistence(version_def, nodes, digest)
 
         # restart with latest version
-        version, upgrade_segments = versions[-1]
-        self.assert_data_persistence(version, nodes, upgrade_segments, digest)
+        version_def = versions[-1]
+        self.assert_data_persistence(version_def, nodes, digest)
 
-    def assert_data_persistence(self, version, nodes, upgrade_segments, digest):
-        cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS)
+    def assert_data_persistence(self, version_def, nodes, digest):
+        env = prepare_env(version_def.java_home)
+        version = version_def.version
+        cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS, env)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
-            self._upgrade(cursor, upgrade_segments)
+            self._upgrade(cursor, version_def.upgrade_segments)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
-            run_selects(cursor, version)
+            run_selects(cursor, version_def.version)
             container = conn.get_blob_container('b1')
             container.get(digest)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
@@ -238,14 +257,14 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        '2.3.x',
-        'latest-nightly',
+        VersionDef('2.3.x', False, []),
+        VersionDef('latest-nightly', False, [])
     )
 
     def test_metadata_compatibility(self):
         nodes = 3
 
-        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
                                     self.CLUSTER_SETTINGS)
         cluster.start()
@@ -265,16 +284,18 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             ''')
         self._process_on_stop()
 
-        for version in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_meta_data(version, nodes)
+        for version_def in self.SUPPORTED_VERSIONS[1:]:
+            self.assert_meta_data(version_def, nodes)
 
         # restart with latest version
         self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes)
 
-    def assert_meta_data(self, version, nodes):
-        cluster = self._new_cluster(version,
-                                    nodes,
-                                    self.CLUSTER_SETTINGS)
+    def assert_meta_data(self, version_def, nodes):
+        cluster = self._new_cluster(
+            version_def.version,
+            nodes,
+            self.CLUSTER_SETTINGS,
+            prepare_env(version_def.java_home))
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -308,18 +329,17 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
 
     CLUSTER_SETTINGS = {
         'cluster.name': CLUSTER_ID,
-        'es.api.enabled': 'true'
     }
 
     SUPPORTED_VERSIONS = (
-        '2.1.x',
-        'latest-nightly',
+        VersionDef('3.0.x', False, []),
+        VersionDef('latest-nightly', False, [])
     )
 
     def test_metadata_compatibility(self):
         nodes = 3
 
-        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
                                     self.CLUSTER_SETTINGS)
         cluster.start()
@@ -328,10 +348,10 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute("select 1")
         self._process_on_stop()
 
-        for version in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_dynamic_string_detection(version, nodes)
+        for version_def in self.SUPPORTED_VERSIONS[1:]:
+            self.assert_dynamic_string_detection(version_def, nodes)
 
-    def assert_dynamic_string_detection(self, version, nodes):
+    def assert_dynamic_string_detection(self, version_def, nodes):
         """ Test that a dynamic string column detection works as expected.
 
         If the cluster was initially created/started with a lower CrateDB
@@ -340,9 +360,12 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         re-creating tables would not help.
         """
         self._move_nodes_folder_if_needed()
-        cluster = self._new_cluster(version,
-                                    nodes,
-                                    self.CLUSTER_SETTINGS)
+        cluster = self._new_cluster(
+            version_def.version,
+            nodes,
+            self.CLUSTER_SETTINGS,
+            prepare_env(version_def.java_home)
+        )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -373,20 +396,22 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        '2.3.x',
-        'latest-nightly',
+        VersionDef('2.3.x', False, []),
+        VersionDef('3.2.x', False, [])
     )
 
     def test_altering_tables_with_old_settings(self):
-        """ Test that the settings of tables created with an old not anymore supported setting can still be changed
-        when running with the latest version.
-        This test ensures that old settings are removed on upgrade or at latest when changing some table settings.
-        Before 3.1.2, purging old settings was not done correctly and thus altering settings of such tables failed.
+        """ Test that the settings of tables created with an old not anymore
+        supported setting can still be changed when running with the latest
+        version. This test ensures that old settings are removed on upgrade or
+        at latest when changing some table settings. Before 3.1.2, purging old
+        settings was not done correctly and thus altering settings of such
+        tables failed.
         """
 
         nodes = 3
 
-        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0],
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
                                     self.CLUSTER_SETTINGS)
         cluster.start()
@@ -405,13 +430,16 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
             ''')
         self._process_on_stop()
 
-        for version in self.SUPPORTED_VERSIONS[1:]:
-            self.start_cluster_and_alter_tables(version, nodes)
+        for version_def in self.SUPPORTED_VERSIONS[1:]:
+            self.start_cluster_and_alter_tables(version_def, nodes)
 
-    def start_cluster_and_alter_tables(self, version, nodes):
-        cluster = self._new_cluster(version,
-                                    nodes,
-                                    self.CLUSTER_SETTINGS)
+    def start_cluster_and_alter_tables(self, version_def, nodes):
+        cluster = self._new_cluster(
+            version_def.version,
+            nodes,
+            self.CLUSTER_SETTINGS,
+            prepare_env(version_def.java_home)
+        )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()

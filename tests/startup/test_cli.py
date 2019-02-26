@@ -1,5 +1,4 @@
 import os
-import socket
 import unittest
 from pathlib import Path
 from crate.client import connect
@@ -16,11 +15,6 @@ def randbool():
 
 class StartupTest(NodeProvider, unittest.TestCase):
     fake = Faker(random.choice(list(AVAILABLE_LOCALES)))
-
-    def assert_mqtt_port(self, predicate):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            result = s.connect_ex(('127.0.0.1', 1883))
-            self.assertTrue(predicate(result))
 
     def test_name_settings(self):
         settings = {
@@ -79,7 +73,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
         settings = dict({
             'license.enterprise': True,
             'lang.js.enabled': randbool(),
-            'ingestion.mqtt.enabled': randbool(),
             'auth.host_based.enabled': randbool(),
             'auth.host_based.config.0.user': 'crate',
             'auth.host_based.config.0.host': '127.0.0.1',
@@ -117,10 +110,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
                 self.assertEqual(res[0], 'js_add')
                 self.assertEqual(res[1], 'javascript')
 
-            # MQTT
-            if settings['ingestion.mqtt.enabled']:
-                self.assert_mqtt_port(lambda x: x == 0)
-
     def test_enterprise_disabled(self):
         settings = dict({
             'license.enterprise': False,
@@ -148,8 +137,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
                     LANGUAGE javascript
                     AS 'function js_add(a, b) { return a + b; }'
                 ''')
-            # MQTT
-            self.assert_mqtt_port(lambda x: x > 0)
 
     def test_startup_logs(self):
 
@@ -192,13 +179,13 @@ class StartupTest(NodeProvider, unittest.TestCase):
                     self.assertRegex(
                         line_ctx,
                         rf'version\[{version_str}(-SNAPSHOT)?\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]')
-                elif lineIdx == 4:
-                    self.assertRegex(line_ctx, r'JVM arguments \[.+\]')
                 elif lineIdx == 5:
-                    self.assertTrue('initialized', line_ctx)
+                    self.assertRegex(line_ctx, r'JVM arguments \[.+\]')
                 elif lineIdx == 6:
-                    self.assertTrue('starting ...', line_ctx)
+                    self.assertTrue('initialized', line_ctx)
                 elif lineIdx == 7:
+                    self.assertTrue('starting ...', line_ctx)
+                elif lineIdx == 8:
                     self.assertTrue('started', line_ctx)
 
     @staticmethod
