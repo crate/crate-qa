@@ -61,13 +61,11 @@ class StartupTest(NodeProvider, unittest.TestCase):
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
             cur.execute('''
-                SELECT settings['license']['enterprise'] AS enabled,
-                       settings['license']['ident'] AS ident
+                SELECT settings['license']['enterprise'] AS enabled
                 FROM sys.cluster
             ''')
             res = cur.fetchone()
             self.assertEqual(res[0], is_enterprise)
-            self.assertEqual(res[1], '')
 
     def test_enterprise_enabled(self):
         settings = dict({
