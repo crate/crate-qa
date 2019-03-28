@@ -125,16 +125,16 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
                               ['s', 'v2']])
 
             cursor.execute("""
-            SELECT table_name, column_name, data_type
+            SELECT table_name, column_name
             FROM information_schema.columns
             WHERE table_name IN ('v1', 'v2')
-            ORDER BY table_name, column_name, data_type
+            ORDER BY table_name, column_name
             """)
             result = cursor.fetchall()
             self.assertEqual(result,
-                             [['v1', 'ts', 'timestamp'],
-                              ['v1', 'value', 'float'],
-                              ['v2', 'day', 'timestamp'],
-                              ['v2', 'ts', 'timestamp'],
-                              ['v2', 'type', 'short'],
-                              ['v2', 'value', 'float']])
+                             [['v1', 'ts'],
+                              ['v1', 'value'],
+                              ['v2', 'day'],
+                              ['v2', 'ts'],
+                              ['v2', 'type'],
+                              ['v2', 'value']])

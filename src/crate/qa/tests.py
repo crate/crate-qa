@@ -53,6 +53,13 @@ def test_settings(version: V) -> Dict[str, Any]:
     return s
 
 
+def remove_unsupported_settings(version: V, settings: dict) -> Dict[str, Any]:
+    new_settings = dict(settings)
+    if version >= V('4.0.0'):
+        new_settings.pop('license.enterprise', None)
+    return new_settings
+
+
 def version_tuple_to_strict_version(version_tuple: tuple) -> V:
     return V('.'.join([str(v) for v in version_tuple]))
 
@@ -214,6 +221,7 @@ class NodeProvider:
             }
             s.update(settings or {})
             s.update(test_settings(v))
+            s = remove_unsupported_settings(v, s)
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
                 'CRATE_HOME': crate_dir,

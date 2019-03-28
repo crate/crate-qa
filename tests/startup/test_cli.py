@@ -1,9 +1,11 @@
 import os
 import unittest
 from pathlib import Path
+
+from distutils.version import StrictVersion as V
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
-from crate.qa.tests import NodeProvider
+from crate.qa.tests import NodeProvider, version_tuple_to_strict_version
 from faker import Faker
 from faker.config import AVAILABLE_LOCALES
 from faker.generator import random
@@ -77,7 +79,12 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'auth.host_based.config.0.protocol': 'http',
         })
 
-        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
+        v = version_tuple_to_strict_version(version_tuple)
+        if v >= V('4.0.0'):
+            # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
+            return
+
         node.start()
 
         self._assert_enterprise_equal(node, True)
@@ -113,7 +120,12 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'license.enterprise': False,
         })
 
-        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
+        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
+        v = version_tuple_to_strict_version(version_tuple)
+        if v >= V('4.0.0'):
+            # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
+            return
+
         node.start()
 
         self._assert_enterprise_equal(node, False)
