@@ -258,6 +258,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
 
     SUPPORTED_VERSIONS = (
         VersionDef('2.3.x', False, []),
+        VersionDef('3.3.x', False, []),
         VersionDef('latest-nightly', False, [])
     )
 
