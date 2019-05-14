@@ -1,6 +1,5 @@
 import os
 import sys
-import math
 import time
 import shutil
 import string
@@ -186,8 +185,6 @@ class NodeProvider:
             self.assertFalse(port in settings)
         s = {
             'cluster.name': gen_id(),
-            'discovery.zen.ping.unicast.hosts': self._unicast_hosts(num_nodes),
-            'discovery.zen.minimum_master_nodes': math.floor(num_nodes / 2.0 + 1),
             'gateway.recover_after_nodes': num_nodes,
             'gateway.expected_nodes': num_nodes,
             'node.max_local_storage_nodes': num_nodes,
