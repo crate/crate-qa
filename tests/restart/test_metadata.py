@@ -75,11 +75,13 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             ORDER BY grantee, ident, type
             """)
             result = cursor.fetchall()
-            self.assertEqual(len(result), 8)
+            self.assertEqual(len(result), 10)
             expected = [['user_a', 'doc', 'DENY', 'DQL'],
+                        ['user_a', 'sys', 'GRANT', 'AL'],
                         ['user_a', 'sys', 'GRANT', 'DDL'],
                         ['user_a', 'sys', 'GRANT', 'DML'],
                         ['user_a', 'sys', 'GRANT', 'DQL'],
+                        ['user_b', 'doc', 'GRANT', 'AL'],
                         ['user_b', 'doc', 'GRANT', 'DDL'],
                         ['user_b', 'doc', 'GRANT', 'DML'],
                         ['user_b', 'doc', 'GRANT', 'DQL'],
