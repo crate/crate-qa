@@ -45,6 +45,10 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
             row = cursor.fetchone()
             self.assertIsNotNone(row)
 
+            cursor.execute("SELECT name FROM sys.cluster")
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+
         with open_db_connection(self.connection_str(node)) as cursor:
             cursor.execute("CREATE TABLE t1 ("
                            "id INTEGER PRIMARY KEY, x INTEGER, o OBJECT, a ARRAY(INT), t TIMESTAMP)")
