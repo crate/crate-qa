@@ -33,6 +33,7 @@ setup(
         'cr8>=0.15.0',
         'Cython',
         'asyncpg>=0.18.2',
+        'aiopg',
         'pyodbc',
         'psycopg2-binary==2.7.5'
     ],
