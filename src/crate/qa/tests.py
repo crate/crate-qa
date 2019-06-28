@@ -5,7 +5,6 @@ import shutil
 import string
 import tempfile
 import functools
-from unittest.case import _Outcome
 from pprint import pformat
 from threading import Thread
 from collections import OrderedDict
@@ -159,10 +158,6 @@ class NodeProvider:
     CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
-    # _outcome is an attribute of unittest.TestCase
-    # we need to declare it so that static analysis with mypy does not fail
-    _outcome: _Outcome
-
     def __init__(self, *args, **kwargs):
         self.tmpdirs = []
         super().__init__(*args, **kwargs)
@@ -276,4 +271,4 @@ class NodeProvider:
         self._log_consumers.clear()
 
     def _has_error(self) -> bool:
-        return any(error for (_, error) in self._outcome.errors)
+        return any(error for (_, error) in self._outcome.errors)  # type: ignore
