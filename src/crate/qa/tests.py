@@ -8,11 +8,11 @@ import functools
 from pprint import pformat
 from threading import Thread
 from collections import OrderedDict
-from typing import Dict, Any, NamedTuple, Iterable
+from typing import Dict, Any, NamedTuple, Iterable, List
 from distutils.version import StrictVersion as V
 from faker.generator import random
 from glob import glob
-from cr8.run_crate import CrateNode, LineBuffer, get_crate, _extract_version
+from cr8.run_crate import CrateNode, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
 
@@ -254,18 +254,18 @@ class NodeProvider:
         self._on_stop.clear()
 
     def _add_log_consumer(self, node: CrateNode):
-        buffer = LineBuffer()
-        node.monitor.consumers.append(buffer)
-        self._log_consumers.append((node, buffer))
+        lines: List[str] = []
+        node.monitor.consumers.append(lines.append)
+        self._log_consumers.append((node, lines))
 
     def _crate_logs_on_failure(self):
-        for node, buffer in self._log_consumers:
-            node.monitor.consumers.remove(buffer)
+        for node, lines in self._log_consumers:
+            node.monitor.consumers.remove(lines.append)
             if self._has_error():
                 print_error('=' * 70)
                 print_error('CrateDB logs for test ' + self.id())
                 print_error('-' * 70)
-                for line in buffer.lines:
+                for line in lines:
                     print_error(line)
                 print_error('-' * 70)
         self._log_consumers.clear()
