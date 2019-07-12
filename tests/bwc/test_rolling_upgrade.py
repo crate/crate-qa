@@ -13,9 +13,11 @@ class UpgradePath(NamedTuple):
 
 
 ROLLING_UPGRADES = (
-    UpgradePath('3.2.0', '3.2.x'),
-    UpgradePath('3.1.x', '3.1'),
-    UpgradePath('3.1.0', '3.1.x'),
+    UpgradePath('3.3.0', '3.3.x'),
+    UpgradePath('3.3.x', '3.3'),
+    # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
+    # We can test them starting from 4.0.2
+    UpgradePath('4.0', 'latest-nightly'),
 )
 
 
