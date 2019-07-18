@@ -1,5 +1,5 @@
 ---
-resolver: lts-12.19
+resolver: lts-13.28
 
 packages:
   - .
