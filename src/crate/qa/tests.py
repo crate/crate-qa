@@ -113,7 +113,7 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
         rs = cursor.fetchall()
         print(f'=== {rs}')
         print('-' * 70)
-    raise TimeoutError(f"Shards didn't become active within {timeout}s.")
+    raise TimeoutError(f"Shards {num_active} didn't become active within {timeout}s.")
 
 
 class VersionDef(NamedTuple):

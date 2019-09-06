@@ -45,6 +45,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         """
 
         shards, replicas = (nodes, 1)
+        expected_active_shards = shards + shards * replicas
 
         cluster = self._new_cluster(path.from_version, nodes)
         cluster.start()
@@ -58,16 +59,46 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 WITH (number_of_replicas={replicas})
             ''')
             insert_data(conn, 'doc', 't1', 1000)
+            c.execute(f'''
+                CREATE TABLE doc.parted (
+                    id INT,
+                    value INT
+                ) CLUSTERED INTO {shards} SHARDS
+                PARTITIONED BY (id)
+                WITH (number_of_replicas=0, "write.wait_for_active_shards"=1)
+            ''')
+            c.execute("INSERT INTO doc.parted (id, value) VALUES (1, 1)")
+            # Add the shards of the new partition primaries
+            expected_active_shards += shards
 
         for idx, node in enumerate(cluster):
             new_node = self.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()
-                wait_for_active_shards(c, shards + replicas * shards)
+                wait_for_active_shards(c, expected_active_shards)
                 c.execute(f'''
                     SELECT type, AVG(value)
                     FROM doc.t1
                     GROUP BY type
                 ''')
                 c.fetchall()
+                # Ensure that inserts, which will create a new partition, are working while upgrading
+                c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
+                # Add the shards of the new partition primaries
+                expected_active_shards += shards
+
+        # Finally validate that all shards (primaries and replicas) of all partitions are started
+        # and writes into the partitioned table while upgrading were successful
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            wait_for_active_shards(c, expected_active_shards)
+            c.execute(f'''
+                REFRESH TABLE doc.parted
+            ''')
+            c.execute(f'''
+                SELECT count(*)
+                FROM doc.parted
+            ''')
+            res = c.fetchone()
+            self.assertEqual(res[0], nodes + 1)
