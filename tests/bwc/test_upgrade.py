@@ -14,21 +14,10 @@ from crate.qa.tests import (
     insert_data,
     gen_id,
     prepare_env,
-    JDK_8_JAVA_HOME_CANDIDATES
 )
 
 
 UPGRADE_PATHS = (
-    (
-        VersionDef('2.0.x', False, JDK_8_JAVA_HOME_CANDIDATES),
-        VersionDef('2.1.x', False, JDK_8_JAVA_HOME_CANDIDATES),
-        VersionDef('2.2.x', False, JDK_8_JAVA_HOME_CANDIDATES),
-        VersionDef('2.3.x', True, []),
-        VersionDef('3.0.x', False, []),
-        VersionDef('3.1.x', False, []),
-        VersionDef('3.2.x', False, []),
-        VersionDef('3.3.x', False, []),
-    ),
     (
         VersionDef('3.0.x', False, []),
         VersionDef('3.1.x', False, []),
