@@ -150,12 +150,11 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
     def test_upgrade_paths(self):
         for path in get_test_paths():
-            with self.subTest(path_repr(path)):
-                try:
-                    self.setUp()
-                    self._test_upgrade_path(path, nodes=3)
-                finally:
-                    self.tearDown()
+            try:
+                self.setUp()
+                self._test_upgrade_path(path, nodes=3)
+            finally:
+                self.tearDown()
 
     def _upgrade(self, cursor, upgrade_segments, num_retries=3):
         """
