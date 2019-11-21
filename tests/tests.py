@@ -1,11 +1,10 @@
 import unittest
 
-
 def suite():
     """
     To be executed with `python -m unittest` from same directory as this file.
     """
-    return unittest.TestLoader().discover('.', pattern='test_*.py')
+    return unittest.TestLoader().discover('./tests', pattern='test_*.py')
 
 
 if __name__ == '__main__':
