@@ -1,5 +1,6 @@
 import unittest
 
+
 def suite():
     """
     To be executed with `python -m unittest` from same directory as this file.
