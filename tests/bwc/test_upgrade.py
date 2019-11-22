@@ -1,10 +1,13 @@
 import os
 import shutil
+import threading
 import unittest
 import time
 from uuid import uuid4
 from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
+
+from cr8.run_crate import wait_until
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import (
@@ -16,6 +19,7 @@ from crate.qa.tests import (
     prepare_env,
 )
 
+from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
     (
@@ -445,4 +449,122 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute('''
                 ALTER TABLE p1 SET (number_of_replicas=1)
             ''')
+        self._process_on_stop()
+
+
+class SnapshotCompatibilityTest(NodeProvider, unittest.TestCase):
+
+    CREATE_REPOSITORY = '''
+CREATE REPOSITORY r1 TYPE S3
+WITH (access_key = 'minio',
+secret_key = 'miniostorage',
+bucket='backups',
+endpoint = '127.0.0.1:9000',
+protocol = 'http')
+'''
+
+    CREATE_SNAPSHOT_TPT = "CREATE SNAPSHOT r1.s{} ALL WITH (wait_for_completion = true)"
+
+    RESTORE_SNAPSHOT_TPT = "RESTORE SNAPSHOT r1.s{} ALL WITH (wait_for_completion = true)"
+
+    DROP_DOC_TABLE = 'DROP TABLE t1'
+
+    # This represents an upgrade from a fairly up to date
+    # crate 3.3 cluster to the current major version 4.0
+    VERSION = ('3.3.x', '4.0')
+
+    def test_snapshot_compatibility(self):
+        """Test snapshot compatibility when upgrading 3.3.x -> 4.0.
+
+        Using Minio as a S3 repository, the first cluster that runs
+        creates the repo, a table and inserts/selects some data, which
+        then is snapshotted and deleted. The next cluster recovers the
+        data from the last snapshot, performs further inserts/selects,
+        to then snapshot the data and delete it.
+
+        We are interested in the transition 3.3.x -> 4.0
+        """
+        with MinioServer() as minio:
+            t = threading.Thread(target=minio.run)
+            t.daemon = True
+            t.start()
+            wait_until(lambda: _is_up('127.0.0.1', 9000))
+
+            num_nodes = 3
+            num_docs = 30
+            prev_version = None
+            num_snapshot = 1
+            path_data = 'data_test_snapshot_compatibility'
+            cluster_settings = {
+                'cluster.name': gen_id(),
+                'path.data': path_data
+            }
+            shutil.rmtree(path_data, ignore_errors=True)
+            for version in self.VERSION:
+                cluster = self._new_cluster(version, num_nodes, settings=cluster_settings)
+                cluster.start()
+                with connect(cluster.node().http_url, error_trace=True) as conn:
+                    c = conn.cursor()
+                    if not prev_version:
+                        c.execute(self.CREATE_REPOSITORY)
+                        c.execute(CREATE_ANALYZER)
+                        c.execute(CREATE_DOC_TABLE)
+                        insert_data(conn, 'doc', 't1', num_docs)
+                    else:
+                        c.execute(self.RESTORE_SNAPSHOT_TPT.format(num_snapshot - 1))
+                    c.execute('SELECT COUNT(*) FROM t1')
+                    rowcount = c.fetchone()[0]
+                    self.assertEqual(rowcount, num_docs)
+                    run_selects(c, version)
+                    c.execute(self.CREATE_SNAPSHOT_TPT.format(num_snapshot))
+                    c.execute(self.DROP_DOC_TABLE)
+                self._process_on_stop()
+                prev_version = version
+                num_snapshot += 1
+            shutil.rmtree(path_data, ignore_errors=True)
+
+
+class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
+
+    # Patched nodes must be compatible
+    VERSION = ('4.0', '4.0.8')
+
+    def test_snapshot_compatibility(self):
+        """Test snapshot compatibility when running a cluster with mixed nodes of versions 4.0 and 4.0.8
+        """
+
+        with MinioServer() as minio:
+            t = threading.Thread(target=minio.run)
+            t.daemon = True
+            t.start()
+            wait_until(lambda: _is_up('127.0.0.1', 9000))
+
+            num_nodes = 3
+            num_docs = 30
+            path_data = 'data_test_heterogeneous_snapshot_compatibility'
+            cluster_settings = {
+                'cluster.name': gen_id(),
+                'path.data': path_data
+            }
+            shutil.rmtree(path_data, ignore_errors=True)
+            cluster = self._new_heterogeneous_cluster(self.VERSION, num_nodes, settings=cluster_settings)
+            cluster.start()
+            with connect(cluster.node().http_url, error_trace=True) as conn:
+                c = conn.cursor()
+                c.execute(self.CREATE_REPOSITORY)
+                c.execute(CREATE_ANALYZER)
+                c.execute(CREATE_DOC_TABLE)
+                insert_data(conn, 'doc', 't1', num_docs)
+                c.execute('SELECT COUNT(*) FROM t1')
+                rowcount = c.fetchone()[0]
+                self.assertEqual(rowcount, num_docs)
+                run_selects(c, self.VERSION[-1])
+                c.execute(self.CREATE_SNAPSHOT_TPT.format(1))
+                c.execute(self.DROP_DOC_TABLE)
+                c.execute(self.RESTORE_SNAPSHOT_TPT.format(1))
+                c.execute('SELECT COUNT(*) FROM t1')
+                rowcount = c.fetchone()[0]
+                self.assertEqual(rowcount, num_docs)
+                run_selects(c, self.VERSION[-1])
+            shutil.rmtree(path_data, ignore_errors=True)
         self._process_on_stop()
