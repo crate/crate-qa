@@ -7,3 +7,4 @@ env/
 .stack-work/
 .idea
 *.log
+tests/client_tests/rust/target
