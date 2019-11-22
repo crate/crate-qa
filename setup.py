@@ -32,7 +32,7 @@ setup(
     install_requires=[
         'cr8>=0.16.0',
         'Cython',
-        'asyncpg>=0.18.2',
+        'asyncpg>=0.18.2, < 0.20',
         'pyodbc',
         'psycopg2-binary==2.7.5'
     ],
