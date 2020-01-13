@@ -66,6 +66,17 @@ pipeline {
             '''
           }
         }
+        stage('Stock JDBC tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+              (cd tests/client_tests/stock_jdbc && ./gradlew test)
+            '''
+          }
+        }
         stage('Rust client tests') {
           agent {
             dockerfile {

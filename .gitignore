@@ -8,3 +8,8 @@ env/
 .idea
 *.log
 tests/client_tests/rust/target
+tests/client_tests/stock_jdbc/out
+*.iml
+*.ipr
+*.iws
+.gradle/

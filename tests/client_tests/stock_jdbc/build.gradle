@@ -1,0 +1,22 @@
+plugins {
+    id 'java-library'
+    id 'idea'
+}
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.postgresql:postgresql:42.2.9'
+    testImplementation 'org.hamcrest:hamcrest:2.1'
+    testImplementation 'io.crate:crate-testing:0.7.0'
+}
+
+test {
+    useJUnit()
+    testLogging {
+        exceptionFormat = 'full'
+    }
+}
