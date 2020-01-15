@@ -18,7 +18,8 @@ ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
     UpgradePath('4.0.2', '4.0.x'),
     UpgradePath('4.0.x', '4.0'),
-    UpgradePath('4.0', 'latest-nightly'),
+    UpgradePath('4.0.x', '4.1.0'),
+    UpgradePath('4.1.0', 'latest-nightly'),
 )
 
 
