@@ -1,0 +1,31 @@
+{
+  "name": "node-postgres-test",
+  "version": "1.0.0",
+  "description": "Test using node, node-postgres, and CrateDB",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crate/crate-qa.git",
+    "directory": "tests/client_tests/node-postgres"
+  },
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "crate",
+    "cratedb",
+    "iot",
+    "json",
+    "database",
+    "low-latency"
+  ],
+  "author": "crate.io",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "app": "^0.1.0",
+    "pg": "^7.17.1",
+    "uuid": "^3.4.0",
+    "chai": "^4.2.0",
+    "csv-parser": "^2.3.2"
+  }
+}
