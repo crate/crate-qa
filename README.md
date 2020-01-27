@@ -17,7 +17,7 @@ cd crate-qa
 Create virtualenv and install requirements:
 
 ```
-python3.6 -m venv env
+python3 -m venv env
 source env/bin/activate
 # optional: pip install --upgrade pip wheel
 pip install --upgrade -e .
