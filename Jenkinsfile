@@ -25,7 +25,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              /usr/bin/python3.8 -m venv env
+              /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -41,7 +41,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              /usr/bin/python3.8 -m venv env
+              /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U cr8 crash
               jabba install $JDK_11
@@ -54,7 +54,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              /usr/bin/python3.8 -m venv env
+              /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U cr8
               jabba install $JDK_11
@@ -76,7 +76,7 @@ pipeline {
               export HOME=$(pwd)
               export LANG=en_US.UTF-8
               test -d env && rm -rf env
-              python3.8 -m venv env
+              python3.7 -m venv env
               . env/bin/activate
               python -m pip install -U cr8
               (cd tests/client_tests/rust/ && ./run.sh)
