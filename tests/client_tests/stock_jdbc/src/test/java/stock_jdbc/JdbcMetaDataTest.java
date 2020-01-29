@@ -2,8 +2,6 @@ package stock_jdbc;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.startsWith;
-
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -21,7 +19,7 @@ import org.junit.runners.JUnit4;
 import io.crate.testing.CrateTestCluster;
 
 @RunWith(JUnit4.class)
-public class JdbcClientTest {
+public class JdbcMetaDataTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
