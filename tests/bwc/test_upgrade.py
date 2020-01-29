@@ -1,4 +1,5 @@
 import os
+import random
 import shutil
 import threading
 import unittest
@@ -568,4 +569,52 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
                 self.assertEqual(rowcount, num_docs)
                 run_selects(c, self.VERSION[-1])
             shutil.rmtree(path_data, ignore_errors=True)
+        self._process_on_stop()
+
+
+class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
+
+    VERSION = ('4.1', 'latest-nightly')
+
+    CLUSTER_SETTINGS = {
+        'cluster.name': gen_id(),
+    }
+
+    def test_update_returning_in_mixed_cluster(self):
+
+        """Test backward compatibility when using update with returning clause
+           in a mixed cluster of 4.1 and 4.2 nodes. This test ensures that the
+           previous functionality from 4.1 for update is fully working when a
+           4.2 node is in the cluster. It also ensures that the use of a returning
+           clause from a 4.2 node yields a meaningful error when used in a cluster
+           with 4.1 nodes.
+        """
+
+        cluster = self._new_heterogeneous_cluster(self.VERSION, random.randint(3, 5), self.CLUSTER_SETTINGS)
+        cluster.start()
+
+        node_4_1 = next(x for x in cluster._nodes if '4.1' in x.crate_dir)
+        node_4_2 = next(x for x in cluster._nodes if '4.2' in x.crate_dir)
+
+        with connect(node_4_1.http_url, error_trace=True) as conn_4_1:
+            cursor = conn_4_1.cursor()
+            cursor.execute('CREATE TABLE test (id int primary key, message string) clustered into 2 shards;')
+            cursor.execute('''INSERT INTO test VALUES(1, 'msg');''')
+            cursor.execute('''UPDATE test SET message='updated' WHERE id= 1;''')
+            self.assertEqual(cursor.rowcount, 1)
+            with self.assertRaisesRegex(ProgrammingError,
+                                        '''SQLActionException\\[SQLParseException: line 1:56: mismatched input \\'returning\\' expecting \\{<EOF>, ';'\\}\\]'''
+                                        ):
+                cursor.execute('''UPDATE test SET message='msg' WHERE message= 'updated' returning id''')
+
+            with connect(node_4_2.http_url, error_trace=True) as conn_latest:
+                cursor = conn_latest.cursor()
+                cursor.execute('''UPDATE test SET message='updated' WHERE id= 1;''')
+
+                self.assertEqual(cursor.rowcount, 1)
+                with self.assertRaisesRegex(ProgrammingError, 'SQLActionException\\[UnsupportedFeatureException: '
+                                                              'Returning clause for Update is only supported when all '
+                                                              'nodes in the cluster running at least version 4.2.0\\]'):
+                    cursor.execute('''UPDATE test SET message='msg' WHERE message= 'updated' returning id''')
+
         self._process_on_stop()
