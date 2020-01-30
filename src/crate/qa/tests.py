@@ -191,11 +191,12 @@ class NodeProvider:
             nodes.append(self._new_node(version, s, env)[0])
         return CrateCluster(nodes)
 
-    def _new_heterogeneous_cluster(self, versions, num_nodes, settings=None):
+    def _new_heterogeneous_cluster(self, versions, settings=None):
         self.assertTrue(hasattr(self, '_new_node'))
         settings = settings or {}
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
             self.assertNotIn(port, settings)
+        num_nodes = len(versions)
         s = {
             'cluster.name': gen_id(),
             'gateway.recover_after_nodes': num_nodes,
@@ -204,9 +205,9 @@ class NodeProvider:
         }
         s.update(settings)
         nodes = []
-        for id in range(num_nodes):
-            s['node.name'] = s['cluster.name'] + '-' + str(id)
-            nodes.append(self._new_node(random.choice(versions), s)[0])
+        for i, version in enumerate(versions):
+            s['node.name'] = f"{s['cluster.name']}-{i}"
+            nodes.append(self._new_node(version, s)[0])
         return CrateCluster(nodes)
 
     def upgrade_node(self, old_node, new_version):

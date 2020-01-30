@@ -1,5 +1,4 @@
 import os
-import random
 import shutil
 import threading
 import unittest
@@ -528,8 +527,9 @@ protocol = 'http')
 
 class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
 
-    # Patched nodes must be compatible
-    VERSION = ('4.0', '4.0.8')
+    # Versions after > 4.0.8 contains a fix/change that needs to be compatible with <= 4.0.8
+    # See https://github.com/crate/crate/pull/9327
+    VERSIONS = ('4.0.x', '4.0.8', '4.0.8')
 
     def test_snapshot_compatibility(self):
         """Test snapshot compatibility when running a cluster with mixed nodes of versions 4.0 and 4.0.8
@@ -541,7 +541,6 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
             t.start()
             wait_until(lambda: _is_up('127.0.0.1', 9000))
 
-            num_nodes = 3
             num_docs = 30
             path_data = 'data_test_heterogeneous_snapshot_compatibility'
             cluster_settings = {
@@ -549,7 +548,7 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
                 'path.data': path_data
             }
             shutil.rmtree(path_data, ignore_errors=True)
-            cluster = self._new_heterogeneous_cluster(self.VERSION, num_nodes, settings=cluster_settings)
+            cluster = self._new_heterogeneous_cluster(self.VERSIONS, settings=cluster_settings)
             cluster.start()
             with connect(cluster.node().http_url, error_trace=True) as conn:
                 c = conn.cursor()
@@ -574,7 +573,7 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
 
 class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
 
-    VERSION = ('4.1', 'latest-nightly')
+    VERSIONS = ('4.1.0', '4.1.1', 'latest-nightly')
 
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
@@ -590,7 +589,7 @@ class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
            with 4.1 nodes.
         """
 
-        cluster = self._new_heterogeneous_cluster(self.VERSION, random.randint(3, 5), self.CLUSTER_SETTINGS)
+        cluster = self._new_heterogeneous_cluster(self.VERSIONS, self.CLUSTER_SETTINGS)
         cluster.start()
 
         node_4_1 = next(x for x in cluster._nodes if '4.1' in x.crate_dir)
