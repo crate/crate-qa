@@ -10,6 +10,7 @@ pipeline {
           agent { label 'medium' }
           steps {
             checkout scm
+            sh 'rm -rf env'
             sh '/usr/bin/python3.7 -m venv env'
             sh 'env/bin/python -m pip install -U mypy flake8'
             sh 'find tests -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
@@ -22,6 +23,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
+              rm -rf env
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
@@ -38,6 +40,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
+              rm -rf env
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U cr8 crash
@@ -51,6 +54,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
+              rm -rf env
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U cr8
