@@ -13,3 +13,4 @@ tests/client_tests/stock_jdbc/out
 *.ipr
 *.iws
 .gradle/
+tests/client_tests/node-postgres/node_modules
