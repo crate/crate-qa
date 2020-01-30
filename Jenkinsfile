@@ -18,7 +18,7 @@ pipeline {
             sh 'env/bin/flake8 src/ tests/'
           }
         }
-        stage('Python tests') {
+        stage('Python bwc tests') {
           agent { label 'medium' }
           steps {
             checkout scm
@@ -31,7 +31,75 @@ pipeline {
               jabba install $JDK_11
               export JAVA_HOME=$(jabba which --home $JDK_11)
 
-              (cd tests && python -m unittest -vvvf)
+              (cd tests && python -m unittest discover -vvvf -s bwc)
+            '''
+          }
+        }
+        stage('Python restart tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3.7 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+
+              (cd tests && python -m unittest discover -vvvf -s restart)
+            '''
+          }
+        }
+        stage('Python startup tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3.7 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+
+              (cd tests && python -m unittest discover -vvvf -s startup)
+            '''
+          }
+        }
+        stage('Python sqllogic tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3.7 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+
+              (cd tests && python -m unittest discover -vvvf -s sqllogic)
+            '''
+          }
+        }
+        stage('Python client tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3.7 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+
+              (cd tests && python -m unittest discover -vvvf -s client_tests)
             '''
           }
         }
