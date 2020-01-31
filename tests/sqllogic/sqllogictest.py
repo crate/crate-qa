@@ -30,8 +30,6 @@ QUERY_WHITELIST = [re.compile(o, re.IGNORECASE) for o in [
 ]]
 
 varchar_to_string = partial(re.compile(r'VARCHAR\(\d+\)').sub, 'STRING')
-text_to_string = partial(re.compile('TEXT').sub, 'STRING')
-real_to_double = partial(re.compile('REAL').sub, 'DOUBLE')
 
 
 class IncorrectResult(BaseException):
@@ -54,7 +52,7 @@ class Statement:
         self.query = '\n'.join(cmd[1:])
 
     def execute(self, cursor):
-        stmt = real_to_double(text_to_string(varchar_to_string(self.query)))
+        stmt = varchar_to_string(self.query)
         try:
             cursor.execute(stmt)
         except psycopg2.Error as e:
