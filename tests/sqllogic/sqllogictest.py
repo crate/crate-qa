@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Program to execute sqllogic files against CrateDB.
 
@@ -78,10 +80,14 @@ def validate_hash(rows, formats, expected_values, hash_):
             hash_, digest, rows))
 
 
-def validate_cmp_result(rows, formats, expected_rows):
+def validate_cmp_result(rows, formats, expected_rows, query):
     if rows != expected_rows:
         raise IncorrectResult(
-            'Expected rows: {0}. Got {1}'.format(expected_rows, rows))
+            f'Expected rows: {expected_rows}. Got {rows} running {query}')
+
+
+def validate_noop(rows, formats):
+    pass
 
 
 class Query:
@@ -149,6 +155,7 @@ class Query:
 
     def _init_validation_function(self):
         if not self.result:
+            self.validate_result = validate_noop
             return
         if len(self.result) == 1:
             m = Query.HASHING_RE.match(self.result[0])
@@ -159,7 +166,7 @@ class Query:
                 return
         self.format_rows(self.result)
         self.validate_result = partial(
-            validate_cmp_result, expected_rows=self.result)
+            validate_cmp_result, expected_rows=self.result, query=self.query)
 
     def format_rows(self, rows):
         for i, row in enumerate(rows):
@@ -231,17 +238,16 @@ def parse_cmd(cmd):
 def get_commands(lines):
     """Split lines by empty line occurences into lists of lines"""
     command = []
-    for line in lines:
+    lines = list(lines)
+    for i, line in enumerate(lines):
         if line.startswith(('#', 'hash-threshold')):
             continue
-        line = line.strip()
-        if not line or line == '':
-            if not command:
-                continue
+        line = line.rstrip('\n')
+        if line:
+            command.append(line)
+        elif command:
             yield command
             command = []
-        else:
-            command.append(line)
     if command:
         yield command
 
@@ -344,7 +350,15 @@ def main():
                         action='store_true', default=False,
                         help='Fail on first error.')
     args = parser.parse_args()
-    run_file(args.file, args.host, args.port, args.log_level, None, args.failfast)
+    run_file(
+        args.file,
+        args.host,
+        args.port,
+        args.log_level,
+        None,
+        args.failfast,
+        'doc'
+    )
 
 
 if __name__ == "__main__":
