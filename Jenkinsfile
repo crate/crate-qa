@@ -82,6 +82,7 @@ pipeline {
               jabba install $JDK_11
               export JAVA_HOME=$(jabba which --home $JDK_11)
 
+              git submodule update --init
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
             '''
           }
