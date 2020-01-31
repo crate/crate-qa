@@ -23,7 +23,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "app": "^0.1.0",
-    "pg": "^7.17.1",
+    "pg": ">7.17.1",
     "uuid": "^3.4.0",
     "chai": "^4.2.0",
     "csv-parser": "^2.3.2"

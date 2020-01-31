@@ -8,6 +8,7 @@ Staring the node-postgres_ module as middleware.
 
 Run it like:
 
+- `npm install` (required once, to fetch the dependencies)
 - `node app.js <host> <port>` (requires **CrateDB** to be running on <host>:<port>).
 - `./run.sh` (takes care of running **CrateDB** by means of cr8_).
 
