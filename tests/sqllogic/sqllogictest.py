@@ -65,7 +65,7 @@ class Statement:
         return 'Statement<{0:.30}>'.format(self.query)
 
 
-def validate_hash(rows, formats, expected_values, hash_):
+def validate_hash(rows, formats, expected_values, hash_, filename):
     values = len(rows)
     if values != expected_values:
         raise IncorrectResult(
@@ -76,14 +76,13 @@ def validate_hash(rows, formats, expected_values, hash_):
         m.update('\n'.encode('ascii'))
     digest = m.hexdigest()
     if digest != hash_:
-        raise IncorrectResult('Expected values hashing to {0}. Got {1}\n{2}'.format(
-            hash_, digest, rows))
+        raise IncorrectResult(f'[{filename}] Expected values hashing to {hash_}. Got {digest}\n{rows}')
 
 
-def validate_cmp_result(rows, formats, expected_rows, query):
+def validate_cmp_result(rows, formats, expected_rows, query, filename):
     if rows != expected_rows:
         raise IncorrectResult(
-            f'Expected rows: {expected_rows}. Got {rows} running {query}')
+            f'[{filename}] Expected rows: {expected_rows}. Got {rows} running {query}')
 
 
 def validate_noop(rows, formats):
@@ -95,7 +94,7 @@ class Query:
     HASHING_RE = re.compile(r'(\d+) values hashing to ([a-z0-9]+)')
     VALID_RESULT_FORMATS = set('TIR')
 
-    def __init__(self, cmd):
+    def __init__(self, cmd, filename):
         """Create a query
 
         cmd format is:
@@ -151,22 +150,28 @@ class Query:
                 'Invalid result format codes: {0}\n{1}'.format(result_formats, cmd))
         self.result_formats = result_formats
         self.sort = sort
-        self._init_validation_function()
+        self.validate_result = self._init_validation_function(filename)
 
-    def _init_validation_function(self):
+    def _init_validation_function(self, filename):
         if not self.result:
-            self.validate_result = validate_noop
-            return
+            return validate_noop
         if len(self.result) == 1:
             m = Query.HASHING_RE.match(self.result[0])
             if m:
                 values, hash_ = m.groups()
-                self.validate_result = partial(
-                    validate_hash, expected_values=int(values), hash_=hash_)
-                return
+                return partial(
+                    validate_hash,
+                    expected_values=int(values),
+                    hash_=hash_,
+                    filename=filename
+                )
         self.format_rows(self.result)
-        self.validate_result = partial(
-            validate_cmp_result, expected_rows=self.result, query=self.query)
+        return partial(
+            validate_cmp_result,
+            expected_rows=self.result,
+            query=self.query,
+            filename=filename
+        )
 
     def format_rows(self, rows):
         for i, row in enumerate(rows):
@@ -199,7 +204,7 @@ class Query:
             self.result_formats, self.sort, self.query)
 
 
-def parse_cmd(cmd):
+def parse_cmd(cmd, filename):
     """Parse a command into Statement or Query
 
     >>> parse_cmd(['statement ok', 'INSERT INTO tab0 VALUES(35,97,1)'])
@@ -231,7 +236,7 @@ def parse_cmd(cmd):
     if type_.startswith('statement'):
         return Statement(cmd)
     if type_.startswith('query'):
-        return Query(cmd)
+        return Query(cmd, filename)
     raise ValueError('Could not parse command: {0}'.format(cmd))
 
 
@@ -311,7 +316,7 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema):
     attr = dict(testfile=fh.name)
     try:
         for cmd in commands:
-            s_or_q = parse_cmd(cmd)
+            s_or_q = parse_cmd(cmd, filename)
             if not dml_done and isinstance(s_or_q, Query):
                 dml_done = True
                 _refresh_tables(cursor, schema)
