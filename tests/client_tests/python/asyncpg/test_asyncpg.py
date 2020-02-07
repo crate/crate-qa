@@ -40,6 +40,10 @@ async def exec_queries(test, hosts):
         ''', 1, 2)
         test.assertEqual(result, 'INSERT 0 1')
 
+        result = await conn.fetch('SELECT pg_catalog.pg_get_keywords()')
+        keyword = sorted([row[0] for row in result], key=lambda x: x[0])[0]
+        test.assertEqual(keyword, ('add', 'R', 'reserved'))
+
 
 async def fetch_summits(test, host, port):
     conn = await asyncpg.connect(
