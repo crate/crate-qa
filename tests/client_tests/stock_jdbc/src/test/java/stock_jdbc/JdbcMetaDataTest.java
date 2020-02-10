@@ -23,7 +23,7 @@ public class JdbcMetaDataTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
-        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202001260002-da42574.tar.gz")
+        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202002120002-289d32d.tar.gz")
         .settings(Map.of("psql.port", 55432))
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55432/doc?user=crate";
@@ -93,10 +93,10 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9566")
     public void test_getBestRowIdentifier() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getBestRowIdentifier("doc", "sys", "summits", DatabaseMetaData.bestRowSession, true);
+            var result = conn.getMetaData().getBestRowIdentifier(null, "sys", "summits", DatabaseMetaData.bestRowSession, true);
+            assertThat(result.next(), is(false));
         }
     }
 
@@ -407,10 +407,10 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("Similar to https://github.com/crate/crate/issues/9566")
     public void test_getPrimaryKeys() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            ResultSet results = conn.getMetaData().getPrimaryKeys("", "sys", "summits");
+            ResultSet results = conn.getMetaData().getPrimaryKeys(null, "sys", "summits");
+            assertThat(results.next(), is(false));
         }
     }
 
@@ -549,7 +549,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getTables() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getTables("", "sys", "", new String[0]);
+            var results = conn.getMetaData().getTables(null, "sys", "", null);
             assertThat(results.next(), is(true));
             assertThat(results.getString(3), is("allocations"));
         }
@@ -566,7 +566,7 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9545")
+    @Ignore("https://github.com/crate/crate/issues/9320")
     public void test_getTypeInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getTypeInfo();
