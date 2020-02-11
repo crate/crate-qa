@@ -571,13 +571,24 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
         self._process_on_stop()
 
 
-class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
+class ReturningNodesCompatibilityTest(NodeProvider, unittest.TestCase):
 
-    VERSIONS = ('4.1.0', '4.1.1', 'latest-nightly')
+    VERSIONS = ('4.1.x', 'latest-nightly')
 
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
     }
+
+    def setUp(self):
+        super().setUp()
+        self.cluster = self._new_heterogeneous_cluster(self.VERSIONS, self.CLUSTER_SETTINGS)
+        self.cluster.start()
+        self.node_4_1 = next(x for x in self.cluster._nodes if '4.1' in x.crate_dir)
+        self.node_4_2 = next(x for x in self.cluster._nodes if '4.2' in x.crate_dir)
+
+    def tearDown(self):
+        self._process_on_stop()
+        super().tearDown()
 
     def test_update_returning_in_mixed_cluster(self):
 
@@ -589,13 +600,7 @@ class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
            with 4.1 nodes.
         """
 
-        cluster = self._new_heterogeneous_cluster(self.VERSIONS, self.CLUSTER_SETTINGS)
-        cluster.start()
-
-        node_4_1 = next(x for x in cluster._nodes if '4.1' in x.crate_dir)
-        node_4_2 = next(x for x in cluster._nodes if '4.2' in x.crate_dir)
-
-        with connect(node_4_1.http_url, error_trace=True) as conn_4_1:
+        with connect(self.node_4_1.http_url, error_trace=True) as conn_4_1:
             cursor = conn_4_1.cursor()
             cursor.execute('CREATE TABLE test (id int primary key, message string) clustered into 2 shards;')
             cursor.execute('''INSERT INTO test VALUES(1, 'msg');''')
@@ -606,7 +611,7 @@ class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
                                         ):
                 cursor.execute('''UPDATE test SET message='msg' WHERE message= 'updated' returning id''')
 
-            with connect(node_4_2.http_url, error_trace=True) as conn_latest:
+            with connect(self.node_4_2.http_url, error_trace=True) as conn_latest:
                 cursor = conn_latest.cursor()
                 cursor.execute('''UPDATE test SET message='updated' WHERE id= 1;''')
 
@@ -616,4 +621,31 @@ class ReturningUpdateNodesCompatibilityTest(NodeProvider, unittest.TestCase):
                                                               'nodes in the cluster running at least version 4.2.0\\]'):
                     cursor.execute('''UPDATE test SET message='msg' WHERE message= 'updated' returning id''')
 
-        self._process_on_stop()
+    def test_insert_returning_in_mixed_cluster(self):
+
+        """Test backward compatibility when using insert with returning clause
+           in a mixed cluster of 4.1 and 4.2 nodes. This test ensures that the
+           previous functionality from 4.1 for insert is fully working when a
+           4.2 node is in the cluster. It also ensures that the use of a returning
+           clause from a 4.2 node yields a meaningful error when used in a cluster
+           with 4.1 nodes.
+        """
+
+        with connect(self.node_4_1.http_url, error_trace=True) as conn_4_1:
+            cursor = conn_4_1.cursor()
+            cursor.execute('CREATE TABLE test (id int primary key, message string) clustered into 2 shards;')
+            self.assertEqual(cursor.rowcount, 1)
+            with self.assertRaisesRegex(ProgrammingError,
+                                        '''SQLActionException\\[SQLParseException: line 1:35: mismatched input \\'returning\\' expecting \\{<EOF>, ';'\\}\\]'''
+                                        ):
+                cursor.execute('''INSERT INTO test VALUES(1, 'msg') returning id''')
+
+            with connect(self.node_4_2.http_url, error_trace=True) as conn_latest:
+                cursor = conn_latest.cursor()
+                cursor.execute('''INSERT INTO test VALUES(1, 'msg')''')
+
+                self.assertEqual(cursor.rowcount, 1)
+                with self.assertRaisesRegex(ProgrammingError, 'SQLActionException\\[UnsupportedFeatureException: '
+                                                              'Returning clause for Insert is only supported when all '
+                                                              'nodes in the cluster running at least version 4.2.0\\]'):
+                    cursor.execute('''INSERT INTO test VALUES(2, 'msg') returning id''')
