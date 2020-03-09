@@ -23,7 +23,7 @@ public class JdbcMetaDataTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
-        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202002120002-289d32d.tar.gz")
+        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202003080002-5ccd5ca.tar.gz")
         .settings(Map.of("psql.port", 55432))
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55432/doc?user=crate";
@@ -96,7 +96,7 @@ public class JdbcMetaDataTest {
     public void test_getBestRowIdentifier() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var result = conn.getMetaData().getBestRowIdentifier(null, "sys", "summits", DatabaseMetaData.bestRowSession, true);
-            assertThat(result.next(), is(false));
+            assertThat(result.next(), is(true));
         }
     }
 
@@ -409,8 +409,8 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getPrimaryKeys() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            ResultSet results = conn.getMetaData().getPrimaryKeys(null, "sys", "summits");
-            assertThat(results.next(), is(false));
+            ResultSet results = conn.getMetaData().getPrimaryKeys(null, null, null);
+            assertThat(results.next(), is(true));
         }
     }
 
@@ -551,7 +551,7 @@ public class JdbcMetaDataTest {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getTables(null, "sys", "", null);
             assertThat(results.next(), is(true));
-            assertThat(results.getString(3), is("allocations"));
+            assertThat(results.getString(3), is("allocations_pkey"));
         }
     }
 
