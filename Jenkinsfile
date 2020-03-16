@@ -184,6 +184,19 @@ pipeline {
             '''
           }
         }
+        stage('kafka-connect jdbc tests') {
+          agent {
+            label 'docker'
+          }
+          steps {
+            checkout scm
+            sh '''
+              jabba install $JDK_11
+              export JAVA_HOME=$(jabba which --home $JDK_11)
+              (cd tests/kafka-connect-jdbc/ && ./run.sh)
+            '''
+          }
+        }
       }
     }
   }
