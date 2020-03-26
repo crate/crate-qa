@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 
-echo "Remove crate docker image"
+cd "$(dirname "$0")"
 
-docker rmi $(docker images | grep crate/crate | awk '{ print $3 }')
+cratedb_image_id=$(docker images | grep crate/crate | awk '{ print $3 }')
+
+if [[ ${cratedb_image_id} ]] ; then
+	echo "Remove cached crate docker image"
+	docker rmi ${cratedb_image_id}
+fi
 
 docker-compose up -d
 
 echo "Wait until kafka-jdbc-connector is started up!"
 
 KAFKA_CONNECTOR_URL="localhost:8083/"
-max_attempts=10
+MAX_ATTEMPTS=10
 attempt=0
 timeout=1
 status_code=0
 exit_code=0
 
-while (( $attempt < $max_attempts )) ; do
+while (( $attempt < $MAX_ATTEMPTS )) ; do
   status_code=$(curl --write-out %{http_code} --silent --output /dev/null ${KAFKA_CONNECTOR_URL})
 
   if [[ ${status_code} -ne 200 ]] ; then
