@@ -649,3 +649,23 @@ class ReturningNodesCompatibilityTest(NodeProvider, unittest.TestCase):
                                                               'Returning clause for Insert is only supported when all '
                                                               'nodes in the cluster running at least version 4.2.0\\]'):
                     cursor.execute('''INSERT INTO test VALUES(2, 'msg') returning id''')
+
+    def test_insert_in_mixed_cluster(self):
+
+        """Test backward compatibility when using a plain insert in a mixed cluster
+           of 4.1 and 4.2 nodes. Plain inserts without return values or update on conflict
+           became an own operation for efficienty reasons. In case of a mixed cluster
+           the system falls back to use the generic upsert.
+        """
+
+        with connect(self.node_4_1.http_url, error_trace=True) as conn_4_1:
+            cursor = conn_4_1.cursor()
+            cursor.execute('CREATE TABLE test (id int primary key, message string) clustered into 2 shards;')
+            self.assertEqual(cursor.rowcount, 1)
+            cursor.execute('''INSERT INTO test VALUES(1, 'fallback to upsert')''')
+            self.assertEqual(cursor.rowcount, 1)
+
+            with connect(self.node_4_2.http_url, error_trace=True) as conn_latest:
+                cursor = conn_latest.cursor()
+                cursor.execute('''INSERT INTO test VALUES(2, 'fallback to upsert')''')
+                self.assertEqual(cursor.rowcount, 1)
