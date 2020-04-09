@@ -662,10 +662,22 @@ class ReturningNodesCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor = conn_4_1.cursor()
             cursor.execute('CREATE TABLE test (id int primary key, message string) clustered into 2 shards;')
             self.assertEqual(cursor.rowcount, 1)
-            cursor.execute('''INSERT INTO test VALUES(1, 'fallback to upsert')''')
-            self.assertEqual(cursor.rowcount, 1)
 
-            with connect(self.node_4_2.http_url, error_trace=True) as conn_latest:
-                cursor = conn_latest.cursor()
-                cursor.execute('''INSERT INTO test VALUES(2, 'fallback to upsert')''')
+            for i in range(10):
+                cursor.execute('''INSERT INTO test(id, message) VALUES (?,?)''', (i, 'test'))
                 self.assertEqual(cursor.rowcount, 1)
+
+            values = [(i, 'test') for i in range(10, 20)]
+            cursor.executemany('''INSERT INTO test(id, message) VALUES (?,?)''', values)
+            self.assertEqual(cursor.rowcount, 10)
+
+        with connect(self.node_4_2.http_url, error_trace=True) as conn_latest:
+            cursor = conn_latest.cursor()
+
+            for i in range(20, 30):
+                cursor.execute('''INSERT INTO test(id, message) VALUES (?,?)''', (i, 'test'))
+                self.assertEqual(cursor.rowcount, 1)
+
+            values = [(i, 'test') for i in range(30, 40)]
+            cursor.executemany('''INSERT INTO test(id, message) VALUES (?,?)''', values)
+            self.assertEqual(cursor.rowcount, 10)
