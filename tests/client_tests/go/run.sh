@@ -1,7 +1,6 @@
 #!/bin/bash
 
-go get -u "github.com/jackc/pgx"
-cr8 run-crate latest-nightly \
+GO111MODULE=on cr8 run-crate latest-nightly \
     -- @crash --hosts '{node.http_url}' < $(dirname "$0")/setup.sql \
     -- @go run $(dirname "$0")/basic_queries.go \
         --hosts '{node.addresses.psql.host}' \

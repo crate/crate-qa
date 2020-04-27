@@ -1,10 +1,10 @@
 package main
 
 import (
-	"flag"
 	"context"
+	"flag"
 	"fmt"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v4"
 	"log"
 	"time"
 )
@@ -48,7 +48,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if (tsRead.Sub(ts) > (1 * time.Second)) {
+	if tsRead.Sub(ts) > (1 * time.Second) {
 		log.Fatal("Inserted ts doesn't match read ts: ", ts, tsRead)
 	}
 	commandTag, err = conn.Exec(ctx, "update t1 set x = ?", 2)
