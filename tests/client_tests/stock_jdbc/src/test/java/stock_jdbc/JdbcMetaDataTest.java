@@ -2,6 +2,7 @@ package stock_jdbc;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -10,6 +11,7 @@ import java.sql.RowIdLifetime;
 import java.util.Map;
 
 import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -23,7 +25,7 @@ public class JdbcMetaDataTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
-        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202003080002-5ccd5ca.tar.gz")
+        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202006240003-aa1beca.tar.gz")
         .settings(Map.of("psql.port", 55432))
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55432/doc?user=crate";
@@ -147,7 +149,7 @@ public class JdbcMetaDataTest {
             var results = conn.getMetaData().getColumns("", "sys", "summits", "");
             assertThat(results.next(), is(true));
             assertThat(results.getString(3), is("summits"));
-            assertThat(results.getString(4), is("mountain"));
+            assertThat(results.getString(4), is("classification"));
         }
     }
 
@@ -210,18 +212,21 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9567")
     public void test_getFunctionColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getFunctionColumns("", "", "substr", "");
+            assertThat(results.next(), is(false));
         }
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9567")
     public void test_getFunctions() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getFunctions("", "", "s");
+            Assert.assertThrows(
+                "Unknown function: pg_get_function_result",
+                Exception.class,
+                () -> conn.getMetaData().getFunctions("", "", "s")
+            );
         }
     }
 
@@ -241,7 +246,7 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("Related to https://github.com/crate/crate/issues/9566 maybe needs more")
+    @Ignore("Blocked by https://github.com/crate/crate/issues/5463")
     public void test_getIndexInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getIndexInfo("", "sys", "summits", true, true);
@@ -415,10 +420,10 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9567")
+    @Ignore("https://github.com/crate/crate/issues/10131")
     public void test_getProcedureColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            ResultSet results = conn.getMetaData().getProcedureColumns("", "", "", "");
+            conn.getMetaData().getProcedureColumns("", "", "", "");
         }
     }
 
@@ -430,10 +435,10 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9567")
+    @Ignore("pg_function_is_visible https://github.com/crate/crate/issues/10132")
     public void test_getProcedures() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getProcedures("", "", "");
+            conn.getMetaData().getProcedures("", "", "");
         }
     }
 
@@ -582,10 +587,11 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9551")
     public void test_getVersionColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-             conn.getMetaData().getVersionColumns("", "sys", "summits");
+             var results = conn.getMetaData().getVersionColumns("", "sys", "summits");
+             assertThat(results.next(), is(true));
+             assertThat(results.getString(2), is("ctid"));
         }
     }
 
