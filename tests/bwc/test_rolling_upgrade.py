@@ -84,6 +84,16 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     GROUP BY type
                 ''')
                 c.fetchall()
+
+                # Ensure scalar symbols are working across versions
+                c.execute('''
+                    SELECT type, value + 1
+                    FROM doc.t1
+                    WHERE value > 1
+                    LIMIT 1
+                ''')
+                c.fetchone()
+
                 # Ensure that inserts, which will create a new partition, are working while upgrading
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
                 # Add the shards of the new partition primaries
