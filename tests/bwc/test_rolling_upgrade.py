@@ -78,7 +78,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()
                 wait_for_active_shards(c, expected_active_shards)
-                c.execute(f'''
+                c.execute('''
                     SELECT type, AVG(value)
                     FROM doc.t1
                     GROUP BY type
@@ -94,10 +94,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             wait_for_active_shards(c, expected_active_shards)
-            c.execute(f'''
+            c.execute('''
                 REFRESH TABLE doc.parted
             ''')
-            c.execute(f'''
+            c.execute('''
                 SELECT count(*)
                 FROM doc.parted
             ''')
