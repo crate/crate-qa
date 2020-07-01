@@ -23,19 +23,11 @@ from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
     (
-        VersionDef('3.0.x', False, []),
-        VersionDef('3.1.x', False, []),
-        VersionDef('3.2.x', False, []),
-        VersionDef('3.3.x', False, []),
-        VersionDef('3.3', False, []),
-        VersionDef('4.0.x', False, []),
-    ),
-    (
         VersionDef('4.0.x', False, []),
         VersionDef('4.0', False, []),
         VersionDef('4.1.x', False, []),
         VersionDef('latest-nightly', False, [])
-    )
+    ),
 )
 
 CREATE_PARTED_TABLE = '''
