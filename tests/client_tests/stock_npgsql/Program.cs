@@ -31,13 +31,33 @@ namespace stock_npgsql
                     cmd.Parameters.AddWithValue("x", 10);
                     cmd.ExecuteNonQuery();
                 }
-                using (var cmd = new NpgsqlCommand("REFRESH TABLE tbl", conn)) {
+                using (var cmd = new NpgsqlCommand("INSERT INTO tbl (x) VALUES (@x)", conn))
+                {
+                    using (var transaction = conn.BeginTransaction())
+                    {
+                        cmd.Transaction = transaction;
+                        cmd.Parameters.Add("@x", NpgsqlTypes.NpgsqlDbType.Integer);
+
+                        for (int i = 1; i < 10; i++)
+                        {
+                            cmd.Parameters["@x"].Value = i * 10;
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                }
+                using (var cmd = new NpgsqlCommand("REFRESH TABLE tbl", conn))
+                {
                     cmd.ExecuteNonQuery();
                 }
-                using (var cmd = new NpgsqlCommand("SELECT x FROM tbl ORDER BY 1 LIMIT 10", conn))
-                using (var reader = cmd.ExecuteReader()) {
+
+                using (var cmd = new NpgsqlCommand("SELECT x FROM tbl ORDER BY 1 ASC LIMIT 10", conn))
+                using (var reader = cmd.ExecuteReader())
+                {
                     Debug.Assert(reader.Read());
-                    Debug.Assert((int)reader[0] == 10);
+                    int value = (int) reader[0];
+                    Debug.Assert(value == 10, "first value must be 10, but is " + value);
                 }
             }
         }
