@@ -27,6 +27,7 @@ UPGRADE_PATHS = (
         VersionDef('4.0', False, []),
         VersionDef('4.1.x', False, []),
         VersionDef('4.2.x', False, []),
+        VersionDef('4.2', False, []),
         VersionDef('latest-nightly', False, [])
     ),
 )
@@ -566,7 +567,7 @@ class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
 
 class ReturningNodesCompatibilityTest(NodeProvider, unittest.TestCase):
 
-    VERSIONS = ('4.1.x', 'latest-nightly')
+    VERSIONS = ('4.1.x', '4.2')
 
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
