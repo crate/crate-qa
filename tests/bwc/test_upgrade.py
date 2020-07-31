@@ -28,7 +28,7 @@ UPGRADE_PATHS = (
         VersionDef('4.1.x', False, []),
         VersionDef('4.2.x', False, []),
         VersionDef('4.2', False, []),
-        VersionDef('latest-nightly', False, [])
+        VersionDef('branch:master', False, [])
     ),
 )
 
@@ -190,7 +190,6 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster = self._new_cluster(
             version_def.version, nodes, self.CLUSTER_SETTINGS, env)
         cluster.start()
-        digest = None
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute(CREATE_ANALYZER)
@@ -221,9 +220,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
-            wait_for_active_shards(cursor, 0)
-            self._upgrade(cursor, version_def.upgrade_segments)
+            wait_for_active_shards(cursor, num_active=0)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
+            self._upgrade(cursor, version_def.upgrade_segments, num_retries=5)
             run_selects(cursor, version_def.version)
             container = conn.get_blob_container('b1')
             container.get(digest)
