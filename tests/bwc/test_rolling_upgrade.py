@@ -84,6 +84,13 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     GROUP BY type
                 ''')
                 c.fetchall()
+                # Ensure aggregation with different intermediate input works, this was an regression for 4.1 <-> 4.2
+                c.execute('''
+                    SELECT type, count(distinct value)
+                    FROM doc.t1
+                    GROUP BY type
+                ''')
+                c.fetchall()
 
                 # Ensure scalar symbols are working across versions
                 c.execute('''
