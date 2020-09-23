@@ -105,16 +105,22 @@ pipeline {
           }
         }
         stage('Go client tests') {
-          agent { label 'medium' }
+          agent {
+            dockerfile {
+              label 'docker'
+              filename 'tests/client_tests/go/Dockerfile'
+            }
+          }
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.7 -m venv env
-              source env/bin/activate
+              export HOME=$(pwd)
+              export LANG=en_US.UTF-8
+              test -d env && rm -rf env
+              python3 -m venv env
+              . env/bin/activate
               python -m pip install -U cr8 crash
-              jabba install $JDK_11
-              JAVA_HOME=$(jabba which --home $JDK_11) tests/client_tests/go/run.sh
+              (cd tests/client_tests/go && ./run.sh)
             '''
           }
         }
