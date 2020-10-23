@@ -14,14 +14,14 @@ class UpgradePath(NamedTuple):
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.0'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.1'),
+    #UpgradePath('4.0.2', '4.0.x'),
+    #UpgradePath('4.0.x', '4.0'),
+    #UpgradePath('4.0.x', '4.1.0'),
+    #UpgradePath('4.1.0', '4.1.x'),
+    #UpgradePath('4.1.x', '4.1'),
     UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', 'latest-nightly'),
+    #UpgradePath('4.2.x', '4.3.x'),
+    #UpgradePath('4.3.x', 'latest-nightly'),
 )
 
 
@@ -107,6 +107,9 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
+
+                c.execute("DELETE FROM doc.t1")
+                insert_data(conn, 'doc', 't1', 10)
 
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
