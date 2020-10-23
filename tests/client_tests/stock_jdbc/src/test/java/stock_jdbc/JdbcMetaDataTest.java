@@ -25,7 +25,7 @@ public class JdbcMetaDataTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
-        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202006240003-aa1beca.tar.gz")
+        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-latest.tar.gz")
         .settings(Map.of("psql.port", 55432))
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55432/doc?user=crate";
@@ -222,11 +222,8 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getFunctions() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            Assert.assertThrows(
-                "Unknown function: pg_get_function_result",
-                Exception.class,
-                () -> conn.getMetaData().getFunctions("", "", "s")
-            );
+            var results = conn.getMetaData().getFunctions("", "", "current_schema");
+            assertThat(results.next(), is(true));
         }
     }
 

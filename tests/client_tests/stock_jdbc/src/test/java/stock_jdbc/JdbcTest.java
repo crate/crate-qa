@@ -19,7 +19,7 @@ public class JdbcTest {
 
     @ClassRule
     public static final CrateTestCluster TEST_CLUSTER = CrateTestCluster
-        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-4.2.0-202001260002-da42574.tar.gz")
+        .fromURL("https://cdn.crate.io/downloads/releases/nightly/crate-latest.tar.gz")
         .settings(Map.of("psql.port", 55433))
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55433/doc?user=crate";
