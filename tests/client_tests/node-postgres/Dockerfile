@@ -1,16 +1,12 @@
-FROM openjdk:13
+FROM node:15-buster
 
 RUN \
-  yum install deltarpm -y && \
-  yum update -y && \
-  yum install python3 -y && \
-  yum install -y gcc-c++ make && \
-  curl -sL https://rpm.nodesource.com/setup_13.x | bash - && \
-  yum install nodejs -y && \
-  useradd -ms /bin/bash crate
+  apt-get update && \
+  apt-get -y upgrade && \
+  apt-get -y install python3-venv python3-dev
 
-ENV HOME /home/crate
-WORKDIR /home/crate
-USER crate
+ENV HOME /root
+WORKDIR /root
+USER ROOT
 
 CMD ["bash"]
