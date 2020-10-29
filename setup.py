@@ -30,7 +30,7 @@ setup(
     packages=['crate.qa'],
     namespace_packages=['crate'],
     install_requires=[
-        'cr8>=0.16.0',
+        'cr8>=0.20.0',
         'Cython',
         'asyncpg>=0.18.2, < 0.20',
         'pyodbc',
