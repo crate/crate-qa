@@ -11,7 +11,7 @@ pipeline {
           steps {
             checkout scm
             sh 'rm -rf env'
-            sh '/usr/bin/python3.7 -m venv env'
+            sh '/usr/bin/python3.8 -m venv env'
             sh 'env/bin/python -m pip install -U mypy flake8'
             sh 'find tests -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
             sh 'find src -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
@@ -24,9 +24,9 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
-              python -m pip install -U -e .
+              python3.8 -m pip install -U -e .
 
               jabba install $JDK_11
               export JAVA_HOME=$(jabba which --home $JDK_11)
@@ -41,7 +41,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -58,7 +58,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -75,7 +75,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -93,7 +93,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -130,7 +130,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3.8 -m venv env
               source env/bin/activate
               python -m pip install -U cr8
               jabba install $JDK_11
