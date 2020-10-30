@@ -1,3 +1,4 @@
+import time
 import unittest
 
 from parameterized import parameterized
@@ -5,14 +6,30 @@ from crate.client import connect
 import random
 from random import sample
 
-from crate.qa.tests import NodeProvider, insert_data, UpgradePath, assert_busy
+from crate.qa.tests import NodeProvider, insert_data, UpgradePath
 
-NUMBER_OF_NODES = random.randint(3, 5)
-UPGRADE_42_TO_43 = ('4.2.x to 4.3.x', UpgradePath('4.2.x', '4.3.x'), NUMBER_OF_NODES,)
-UPGRADE_43_TO_LATEST = ('4.3.x to latest-nightly', UpgradePath('4.3.x', 'latest-nightly'), NUMBER_OF_NODES,)
+UPGRADE_PATHS = [(UpgradePath('4.2.x', '4.3.x'),), (UpgradePath('4.3.x', 'latest-nightly'),)]
+UPGRADE_PATHS_FROM_43 = [(UpgradePath('4.3.x', 'latest-nightly'),)]
+
+
+def assert_busy(assertion, timeout=60, f=2.0):
+    waited = 0
+    duration = 0.1
+    assertion_error = None
+    while waited < timeout:
+        try:
+            assertion()
+            return
+        except AssertionError as e:
+            assertion_error = e
+        time.sleep(duration)
+        waited += duration
+        duration *= f
+    raise assertion_error
 
 
 class RecoveryTest(NodeProvider, unittest.TestCase):
+    NUMBER_OF_NODES = 3
     """
     In depth testing of the recovery mechanism during a rolling restart.
     Based on org.elasticsearch.upgrades.RecoveryIT.java
@@ -61,13 +78,13 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             new_node = self.upgrade_node(node, version)
             cluster[i] = new_node
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_recovery_with_concurrent_indexing(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_recovery_with_concurrent_indexing(self, path):
         """
         This test creates a new table and insert data at every stage of the
         rolling upgrade.
         """
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -85,7 +102,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('''alter table doc.test set ("routing.allocation.enable"='primaries')''')
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
             c.execute('''alter table doc.test set ("routing.allocation.enable"='all')''')
             # insert data into a mixed cluster
             insert_data(conn, 'doc', 'test', 50)
@@ -96,7 +113,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # check counts for each node individually
             c.execute('select id from sys.nodes')
             node_ids = c.fetchall()
-            self.assertEqual(len(node_ids), nodes)
+            self.assertEqual(len(node_ids), self.NUMBER_OF_NODES)
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             for node_id in node_ids:
@@ -104,7 +121,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             c.execute('''alter table doc.test set ("routing.allocation.enable"='primaries')''')
             # upgrade the full cluster
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
             c.execute('''alter table doc.test set ("routing.allocation.enable"='all')''')
 
             insert_data(conn, 'doc', 'test', 45)
@@ -115,14 +132,14 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             c.execute('select id from sys.nodes')
             node_ids = c.fetchall()
-            self.assertEqual(len(node_ids), nodes)
+            self.assertEqual(len(node_ids), self.NUMBER_OF_NODES)
 
             for node_id in node_ids:
                 assert_busy(lambda: self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105))
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_relocation_with_concurrent_indexing(self, name, path, nodes):
-        cluster = self._new_cluster(path.from_version, nodes)
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_relocation_with_concurrent_indexing(self, path):
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -141,7 +158,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('''alter table doc.test set("routing.allocation.enable"='none')''')
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             c.execute('''select id from sys.nodes order by version['number'] desc limit 1''')
             new_node_id = c.fetchone()[0]
@@ -169,7 +186,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_num_docs_by_node_id(conn, 'doc', 'test', new_node_id, 60)
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             c.execute('''alter table doc.test set("number_of_replicas"=2)''')
             c.execute('''alter table doc.test reset("routing.allocation.include._id")''')
@@ -180,7 +197,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('refresh table doc.test')
             c.execute('select id from sys.nodes')
             node_ids = c.fetchall()
-            self.assertEqual(len(node_ids), nodes)
+            self.assertEqual(len(node_ids), self.NUMBER_OF_NODES)
 
             for node_id in node_ids:
                 self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
@@ -193,14 +210,14 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self.assertTrue(current_state)
         self.assertEqual(current_state[0], state)
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_recovery(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_recovery(self, path):
         """
         This test creates a new table, insert data and asserts the state at every stage of the
         rolling upgrade.
         """
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -218,26 +235,26 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 c.execute("refresh table doc.test")
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             if random.choice([True, False]):
                 c.execute("refresh table doc.test")
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_recovery_closed_index(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_recovery_closed_index(self, path):
         """
         This test creates a table in the non upgraded cluster and closes it. It then
         checks that the table is effectively closed and potentially replicated.
         """
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -252,24 +269,24 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('alter table doc.test close')
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             self._assert_is_closed(conn, 'doc', 'test')
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             self._assert_is_closed(conn, 'doc', 'test')
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_closed_index_during_rolling_upgrade(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_closed_index_during_rolling_upgrade(self, path):
         """
         This test creates and closes a new table at every stage of the rolling
         upgrade. It then checks that the table is effectively closed and
         replicated.
         """
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -283,7 +300,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_is_closed(conn, 'doc', 'old_cluster')
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             self._assert_is_closed(conn, 'doc', 'old_cluster')
 
@@ -297,7 +314,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_is_closed(conn, 'doc', 'mixed_cluster')
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             self._assert_is_closed(conn, 'doc', 'old_cluster')
             self._assert_is_closed(conn, 'doc', 'mixed_cluster')
@@ -311,13 +328,13 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_is_closed(conn, 'doc', 'upgraded_cluster')
 
-    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
-    def test_update_docs(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS)
+    def test_update_docs(self, path):
         """
         This test creates a new table, insert data and updates data at every state at every stage of the
         rolling upgrade.
         """
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
@@ -332,7 +349,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('refresh table doc.test')
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             if random.choice([True, False]):
                 assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
@@ -351,7 +368,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 c.execute('refresh table doc.test')
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             updates = [(i, str(random.randint)) for i in range(0, 100)]
             res = c.executemany(
@@ -361,8 +378,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             for result in res:
                 self.assertEqual(result['rowcount'], 1)
 
-    @parameterized.expand([UPGRADE_43_TO_LATEST])
-    def test_operation_based_recovery(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS_FROM_43)
+    def test_operation_based_recovery(self, path):
         """
         Tests that we should perform an operation-based recovery if there were
         some but not too many uncommitted documents (i.e., less than 10% of
@@ -371,7 +388,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         based peer recoveries.
         """
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -392,7 +409,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 insert_data(conn, 'doc', 'test', num_docs)
 
             # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
@@ -402,7 +419,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
 
             # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
@@ -412,14 +429,14 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
 
-    @parameterized.expand([UPGRADE_43_TO_LATEST])
-    def test_turnoff_translog_retention_after_upgraded(self, name, path, nodes):
+    @parameterized.expand(UPGRADE_PATHS_FROM_43)
+    def test_turnoff_translog_retention_after_upgraded(self, path):
         """
         Verifies that once all shard copies on the new version, we should turn
         off the translog retention for indices with soft-deletes.
         """
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
         cluster.start()
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -440,7 +457,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 insert_data(conn, 'doc', 'test', num_docs)
 
             # update the cluster to the new version
-            self._upgrade_cluster(cluster, path.to_version, nodes)
+            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             c.execute('refresh table doc.test')

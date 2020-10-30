@@ -28,28 +28,13 @@ JDK_8_JAVA_HOME_CANDIDATES = (
     '/usr/lib/java-1.8.0',
 ) + tuple(glob('/Library/Java/JavaVirtualMachines/jdk*1.8*/Contents/Home'))
 
+
 class UpgradePath(NamedTuple):
     from_version: str
     to_version: str
 
     def __repr__(self):
         return f'{self.from_version} -> {self.to_version}'
-
-
-def assert_busy(assertion, timeout=60, f=2.0):
-    waited = 0
-    duration = 0.1
-    assertion_error = None
-    while waited < timeout:
-        try:
-            assertion()
-            return
-        except AssertionError as e:
-            assertion_error = e
-        time.sleep(duration)
-        waited += duration
-        duration *= f
-    raise assertion_error
 
 
 def prepare_env(java_home_candidates: Iterable[str]) -> dict:
