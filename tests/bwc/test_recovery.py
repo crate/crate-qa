@@ -1,57 +1,23 @@
 import time
 import unittest
 
+from parameterized import parameterized
 from crate.client import connect
 import random
 from random import sample
 
 from crate.qa.tests import NodeProvider, insert_data, UpgradePath
 
+UPGRADE_42_TO_43 = ('4.2.x to 4.3.x', UpgradePath('4.2.x', '4.3.x'), 3,)
+UPGRADE_43_TO_LATEST = ('4.3.x to latest-nightly', UpgradePath('4.3.x', 'latest-nightly'), 3,)
+
 
 class RecoveryTest(NodeProvider, unittest.TestCase):
+
     """
     In depth testing of the recovery mechanism during a rolling restart.
     Based on org.elasticsearch.upgrades.RecoveryIT.java
     """
-
-    def test(self):
-        self._run_tests(
-            [
-                UpgradePath('4.2.x', '4.3.x'),
-                UpgradePath('4.3.x', 'latest-nightly'),
-            ],
-            [
-                self._test_relocation_with_concurrent_indexing,
-                self._test_recovery,
-                self._test_update_docs,
-                self._test_recovery_closed_index,
-                self._test_closed_index_during_rolling_upgrade,
-                self._test_relocation_with_concurrent_indexing,
-            ]
-        )
-
-    def test_from_4_3(self):
-        self._run_tests(
-            [
-                UpgradePath('4.3.x', 'latest-nightly')
-            ],
-            [
-                self._test_turnoff_translog_retention_after_upgraded,
-                self._test_operation_based_recovery,
-            ]
-        )
-
-    def _run_tests(self, paths, tests):
-        for path in paths:
-            for test in tests:
-                with self.subTest(repr(path)):
-                    try:
-                        self.setUp()
-                        print(f'Run {test.__name__} upgrading versions {path}')
-                        test(path, nodes=3)
-                    finally:
-                        self.tearDown()
-
     def _assert_num_docs_by_node_id(self, conn, schema, table_name, node_id, expected_count):
         c = conn.cursor()
         c.execute('''select num_docs from sys.shards where schema_name = ? and table_name = ? and node['id'] = ?''',
@@ -94,7 +60,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             new_node = self.upgrade_node(node, version)
             cluster[i] = new_node
 
-    def _test_recovery_with_concurrent_indexing(self, path, nodes):
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_recovery_with_concurrent_indexing(self, name, path, nodes):
         """
         This test creates a new table and insert data at every stage of the
         rolling upgrade.
@@ -154,8 +121,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             for node_id in node_ids:
                 self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
 
-    def _test_relocation_with_concurrent_indexing(self, path, nodes):
-
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_relocation_with_concurrent_indexing(self, name, path, nodes):
         cluster = self._new_cluster(path.from_version, nodes)
         cluster.start()
 
@@ -224,7 +191,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             for node_id in node_ids:
                 self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
 
-    def _test_recovery(self, path, nodes):
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_recovery(self, name, path, nodes):
         """
         This test creates a new table, insert data and asserts the state at every stage of the
         rolling upgrade.
@@ -261,7 +229,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_is_green(conn, 'doc', 'test')
 
-    def _test_recovery_closed_index(self, path, nodes):
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_recovery_closed_index(self, name, path, nodes):
         """
         This test creates a table in the non upgraded cluster and closes it. It then
         checks that the table is effectively closed and potentially replicated.
@@ -292,7 +261,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_is_closed(conn, 'doc', 'test')
 
-    def _test_closed_index_during_rolling_upgrade(self, path, nodes):
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_closed_index_during_rolling_upgrade(self, name, path, nodes):
         """
         This test creates and closes a new table at every stage of the rolling
         upgrade. It then checks that the table is effectively closed and
@@ -341,7 +311,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_is_closed(conn, 'doc', 'upgraded_cluster')
 
-    def _test_update_docs(self, path, nodes):
+    @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
+    def test_update_docs(self, name, path, nodes):
         """
         This test creates a new table, insert data and updates data at every state at every stage of the
         rolling upgrade.
@@ -391,7 +362,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             for result in res:
                 self.assertEqual(result['rowcount'], 1)
 
-    def _test_operation_based_recovery(self, path, nodes):
+    @parameterized.expand([UPGRADE_43_TO_LATEST])
+    def test_operation_based_recovery(self, name, path, nodes):
         """
         Tests that we should perform an operation-based recovery if there were
         some but not too many uncommitted documents (i.e., less than 10% of
@@ -444,7 +416,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
 
-    def _test_turnoff_translog_retention_after_upgraded(self, path, nodes):
+    @parameterized.expand([UPGRADE_43_TO_LATEST])
+    def test_turnoff_translog_retention_after_upgraded(self, name, path, nodes):
         """
         Verifies that once all shard copies on the new version, we should turn
         off the translog retention for indices with soft-deletes.
