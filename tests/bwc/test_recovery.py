@@ -1,4 +1,3 @@
-import time
 import unittest
 
 from parameterized import parameterized
@@ -6,24 +5,26 @@ from crate.client import connect
 import random
 from random import sample
 
-from crate.qa.tests import NodeProvider, insert_data, UpgradePath
+from crate.qa.tests import NodeProvider, insert_data, UpgradePath, assert_busy
 
-UPGRADE_42_TO_43 = ('4.2.x to 4.3.x', UpgradePath('4.2.x', '4.3.x'), 3,)
-UPGRADE_43_TO_LATEST = ('4.3.x to latest-nightly', UpgradePath('4.3.x', 'latest-nightly'), 3,)
+NUMBER_OF_NODES = random.randint(3, 5)
+UPGRADE_42_TO_43 = ('4.2.x to 4.3.x', UpgradePath('4.2.x', '4.3.x'), NUMBER_OF_NODES,)
+UPGRADE_43_TO_LATEST = ('4.3.x to latest-nightly', UpgradePath('4.3.x', 'latest-nightly'), NUMBER_OF_NODES,)
 
 
 class RecoveryTest(NodeProvider, unittest.TestCase):
-
     """
     In depth testing of the recovery mechanism during a rolling restart.
     Based on org.elasticsearch.upgrades.RecoveryIT.java
     """
+
     def _assert_num_docs_by_node_id(self, conn, schema, table_name, node_id, expected_count):
         c = conn.cursor()
         c.execute('''select num_docs from sys.shards where schema_name = ? and table_name = ? and node['id'] = ?''',
                   (schema, table_name, node_id))
         number_of_docs = c.fetchone()
-        self.assertEqual(number_of_docs[0], expected_count)
+        self.assertTrue(number_of_docs)
+        self.assertEqual(expected_count, number_of_docs[0])
 
     def _assert_is_green(self, conn, schema, table_name):
         c = conn.cursor()
@@ -79,8 +80,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # insert data into the initial homogeneous cluster
             insert_data(conn, 'doc', 'test', 10)
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             # make sure that we can index while the replicas are recovering
             c.execute('''alter table doc.test set ("routing.allocation.enable"='primaries')''')
 
@@ -98,9 +98,9 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             node_ids = c.fetchall()
             self.assertEqual(len(node_ids), nodes)
 
-            time.sleep(3)
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             for node_id in node_ids:
-                self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 60)
+                assert_busy(lambda: self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 60))
 
             c.execute('''alter table doc.test set ("routing.allocation.enable"='primaries')''')
             # upgrade the full cluster
@@ -117,9 +117,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             node_ids = c.fetchall()
             self.assertEqual(len(node_ids), nodes)
 
-            time.sleep(3)
             for node_id in node_ids:
-                self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
+                assert_busy(lambda: self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105))
 
     @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
     def test_relocation_with_concurrent_indexing(self, name, path, nodes):
@@ -135,8 +134,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             insert_data(conn, 'doc', 'test', 10)
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             # make sure that no shards are allocated, so we can make sure the primary stays
             # on the old node (when one node stops, we lose the master too, so a replica
             # will not be promoted)
@@ -157,18 +155,16 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                         "routing.allocation.include._id"=?
                         )''', (old_node_id, ))
 
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             c.execute('''alter table doc.test set ("routing.allocation.include._id"=?)''', (new_node_id, ))
             insert_data(conn, 'doc', 'test', 50)
 
             # ensure the relocation from old node to new node has occurred; otherwise the table is green
             # even though shards haven't moved to the new node yet (allocation was throttled).
-            time.sleep(3)
-            c.execute('select current_state from sys.allocations where node_id =?', (new_node_id,))
-            current_state = c.fetchone()[0]
-            self.assertEqual(current_state, 'STARTED')
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_shard_state(conn, 'doc', 'test', new_node_id, 'STARTED'))
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
             c.execute('refresh table doc.test')
             self._assert_num_docs_by_node_id(conn, 'doc', 'test', new_node_id, 60)
 
@@ -180,16 +176,22 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             insert_data(conn, 'doc', 'test', 45)
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             c.execute('refresh table doc.test')
-            time.sleep(5)
             c.execute('select id from sys.nodes')
             node_ids = c.fetchall()
             self.assertEqual(len(node_ids), nodes)
 
             for node_id in node_ids:
                 self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
+
+    def _assert_shard_state(self, conn, schema, table_name, node_id, state):
+        c = conn.cursor()
+        c.execute('select current_state from sys.allocations where node_id =? and table_name = ? and table_schema = ?',
+                  (node_id, table_name, schema))
+        current_state = c.fetchone()
+        self.assertTrue(current_state)
+        self.assertEqual(current_state[0], state)
 
     @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
     def test_recovery(self, name, path, nodes):
@@ -218,8 +220,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # upgrade to mixed cluster
             self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
 
-            time.sleep(5)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             # upgrade fully to the new version
             self._upgrade_cluster(cluster, path.to_version, nodes)
@@ -227,7 +228,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             if random.choice([True, False]):
                 c.execute("refresh table doc.test")
 
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
     @parameterized.expand([UPGRADE_42_TO_43, UPGRADE_43_TO_LATEST])
     def test_recovery_closed_index(self, name, path, nodes):
@@ -246,8 +247,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                         "unassigned.node_left.delayed_timeout" = '100ms', "allocation.max_retries" = '0')
                       ''')
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             c.execute('alter table doc.test close')
 
@@ -291,7 +291,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                       create table doc.mixed_cluster(x int) clustered into 1 shards with( number_of_replicas = 0)
                       ''')
 
-            self._assert_is_green(conn, 'doc', 'mixed_cluster')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'mixed_cluster'))
             c.execute('alter table doc.mixed_cluster close')
 
             self._assert_is_closed(conn, 'doc', 'mixed_cluster')
@@ -306,7 +306,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                       create table doc.upgraded_cluster(x int) clustered into 1 shards with( number_of_replicas = 0)
                       ''')
 
-            self._assert_is_green(conn, 'doc', 'upgraded_cluster')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'upgraded_cluster'))
             c.execute('alter table doc.upgraded_cluster close')
 
             self._assert_is_closed(conn, 'doc', 'upgraded_cluster')
@@ -335,8 +335,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
 
             if random.choice([True, False]):
-                time.sleep(5)
-                self._assert_is_green(conn, 'doc', 'test')
+                assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             # update the data in a mixed cluster
             updates = [(i, str(random.randint)) for i in range(0, 100)]
@@ -382,8 +381,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                         "soft_deletes.enabled" = true)
                         ''')
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             insert_data(conn, 'doc', 'test', random.randint(100, 200))
             c.execute('refresh table doc.test')
@@ -396,8 +394,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # upgrade to mixed cluster
             self._upgrade_cluster(cluster, path.to_version, random.randint(1, nodes - 1))
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             num_docs = random.randint(0, 3)
             if num_docs > 0:
@@ -407,8 +404,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # upgrade fully to the new version
             self._upgrade_cluster(cluster, path.to_version, nodes)
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             num_docs = random.randint(0, 3)
             if num_docs > 0:
@@ -434,8 +430,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                         "soft_deletes.enabled" = true)
                      ''', (number_of_replicas, ))
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             insert_data(conn, 'doc', 'test', random.randint(100, 200))
             c.execute('refresh table doc.test')
@@ -447,8 +442,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # update the cluster to the new version
             self._upgrade_cluster(cluster, path.to_version, nodes)
 
-            time.sleep(3)
-            self._assert_is_green(conn, 'doc', 'test')
+            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             c.execute('refresh table doc.test')
             self._assert_translog_is_empty(conn, 'doc', 'test')
 

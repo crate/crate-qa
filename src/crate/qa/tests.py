@@ -36,6 +36,22 @@ class UpgradePath(NamedTuple):
         return f'{self.from_version} -> {self.to_version}'
 
 
+def assert_busy(assertion, timeout=60, f=2.0):
+    waited = 0
+    duration = 0.1
+    assertion_error = None
+    while waited < timeout:
+        try:
+            assertion()
+            return
+        except AssertionError as e:
+            assertion_error = e
+        time.sleep(duration)
+        waited += duration
+        duration *= f
+    raise assertion_error
+
+
 def prepare_env(java_home_candidates: Iterable[str]) -> dict:
     for candidate in filter(os.path.exists, java_home_candidates):
         return {'JAVA_HOME': candidate}
