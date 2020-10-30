@@ -28,6 +28,13 @@ JDK_8_JAVA_HOME_CANDIDATES = (
     '/usr/lib/java-1.8.0',
 ) + tuple(glob('/Library/Java/JavaVirtualMachines/jdk*1.8*/Contents/Home'))
 
+class UpgradePath(NamedTuple):
+    from_version: str
+    to_version: str
+
+    def __repr__(self):
+        return f'{self.from_version} -> {self.to_version}'
+
 
 def prepare_env(java_home_candidates: Iterable[str]) -> dict:
     for candidate in filter(os.path.exists, java_home_candidates):

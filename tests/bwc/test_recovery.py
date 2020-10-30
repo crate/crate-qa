@@ -5,8 +5,7 @@ from crate.client import connect
 import random
 from random import sample
 
-from crate.qa.tests import NodeProvider, insert_data
-from bwc.test_rolling_upgrade import UpgradePath
+from crate.qa.tests import NodeProvider, insert_data, UpgradePath
 
 
 class RecoveryTest(NodeProvider, unittest.TestCase):

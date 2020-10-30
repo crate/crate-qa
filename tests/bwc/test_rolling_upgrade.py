@@ -1,16 +1,6 @@
 import unittest
-from typing import NamedTuple
 from crate.client import connect
-from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards
-
-
-class UpgradePath(NamedTuple):
-    from_version: str
-    to_version: str
-
-    def __repr__(self):
-        return f'{self.from_version} -> {self.to_version}'
-
+from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
