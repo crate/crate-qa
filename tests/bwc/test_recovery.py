@@ -503,3 +503,83 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         for r in res:
             self.assertEqual(r[0], 0)
             self.assertEqual(r[1], 0)
+
+    def test_auto_expand_indices_during_rolling_upgrade(self):
+        """
+        This test ensure that replicas are auto-expanding according to the
+        allocation filtering rules in every state during a rolling upgrade.
+        """
+
+        self._run_upgrade_paths(self._test_auto_expand_indices_during_rolling_upgrade, [UpgradePath('latest-nightly', 'latest-nightly')])
+
+    def _test_auto_expand_indices_during_rolling_upgrade(self, path):
+        number_of_nodes = random.randint(3, 5)
+        cluster = self._new_cluster(path.from_version, number_of_nodes)
+        cluster.start()
+
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            c.execute('''create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" =?)''',
+                      (f'''{random.randint(0, 2)}-all''',))
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
+            # all nodes without the primary
+            number_of_replicas = number_of_nodes - 1
+            number_of_replicas_with_excluded_node = number_of_replicas - 1
+
+            c.execute('''select node['id'] from sys.shards''')
+            node_ids = c.fetchall()
+            self.assertEqual(len(node_ids), number_of_nodes)
+
+            # exclude one node from allocation
+            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
+
+            # check that the replicas expanding automatically
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
+            # upgrade to mixed cluster
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+
+            # validate that one node is still excluded
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+
+            # include all nodes again
+            c.execute('alter table doc.test reset ("routing.allocation.exclude._id")')
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
+
+            # exclude one node from allocation again
+            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+
+            # upgrade fully to the new version
+            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            # validate that one node is still excluded
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+
+            # include all nodes again
+            c.execute('alter table doc.test reset ("routing.allocation.exclude._id")')
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
+
+            # exclude one node from allocation again
+            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            # validate that one node is still excluded
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+
+    def _assert_number_of_replicas(self, conn, schema, table_name, count):
+        c = conn.cursor()
+        c.execute('select count(id) from sys.shards where primary=false and table_name = ? and schema_name=?', (table_name, schema))
+        number_of_replicas_allocated = c.fetchone()[0]
+        self.assertEqual(count, number_of_replicas_allocated)
