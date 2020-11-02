@@ -1,6 +1,7 @@
 import time
 import unittest
 
+from cr8.run_crate import get_crate, _extract_version
 from parameterized import parameterized
 from crate.client import connect
 import random
@@ -69,10 +70,14 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self.assertEqual(global_checkpoint, max_seq_no)
             self.assertEqual(local_checkpoint, max_seq_no)
 
-    def _upgrade_cluster(self, cluster, version, nodes):
+    def _fetch_version_tuple(self, version: str) -> tuple:
+        crate_dir = get_crate(version)
+        return _extract_version(crate_dir)
+
+    def _upgrade_cluster(self, cluster, version: str, nodes: int) -> None:
         assert nodes <= len(cluster._nodes)
-        min_version = min([n.version for n in cluster._nodes])
-        nodes_to_upgrade = [(i, n) for i, n in enumerate(cluster) if n.version == min_version]
+        version_tuple = self._fetch_version_tuple(version)
+        nodes_to_upgrade = [(i, n) for i, n in enumerate(cluster) if n.version != version_tuple]
         for i, node in sample(nodes_to_upgrade, min(nodes, len(nodes_to_upgrade))):
             new_node = self.upgrade_node(node, version)
             cluster[i] = new_node
