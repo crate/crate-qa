@@ -14,11 +14,12 @@ UPGRADE_PATHS_FROM_43 = [(UpgradePath('4.3.x', 'latest-nightly'),)]
 
 
 class RecoveryTest(NodeProvider, unittest.TestCase):
-    NUMBER_OF_NODES = 3
     """
     In depth testing of the recovery mechanism during a rolling restart.
     Based on org.elasticsearch.upgrades.RecoveryIT.java
     """
+
+    NUMBER_OF_NODES = 3
 
     def assert_busy(self, assertion, timeout=60, f=2.0):
         waited = 0
