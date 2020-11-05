@@ -583,3 +583,118 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         c.execute('select count(id) from sys.shards where primary=false and table_name = ? and schema_name=?', (table_name, schema))
         number_of_replicas_allocated = c.fetchone()[0]
         self.assertEqual(count, number_of_replicas_allocated)
+
+    def test_retention_leases_established_when_promoting_primary(self):
+        self._run_upgrade_paths(self._test_retention_leases_established_when_promoting_primary, UPGRADE_PATHS_FROM_43)
+
+    def _test_retention_leases_established_when_promoting_primary(self, path):
+        number_of_nodes = random.randint(3, 5)
+        cluster = self._new_cluster(path.from_version, number_of_nodes)
+        cluster.start()
+
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            c = conn.cursor()
+
+            number_of_shards = random.randint(1, 5)
+            number_of_replicas = random.randint(0, 1)
+
+            c.execute(
+                '''create table doc.test(x int) clustered into ? shards with(
+                    "number_of_replicas" = ?,
+                    "soft_deletes.enabled" = false,
+                    "allocation.max_retries" = 0,
+                    "unassigned.node_left.delayed_timeout" = '100ms'
+                    )''',
+                (number_of_shards, number_of_replicas,))
+
+            number_of_docs = random.randint(0, 10)
+            if number_of_docs > 0:
+                insert_data(conn, 'doc', 'test', number_of_docs)
+
+            if random.choice([True, False]):
+                c.execute('refresh table doc.test')
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
+            # upgrade to mixed cluster
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+
+            # upgrade fully to the new version
+            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+
+    def test_retention_leases_established_when_relocating_primary(self):
+        self._run_upgrade_paths(self._test_retention_leases_established_when_relocating_primary, UPGRADE_PATHS_FROM_43)
+
+    def _test_retention_leases_established_when_relocating_primary(self, path):
+        number_of_nodes = random.randint(3, 5)
+        cluster = self._new_cluster(path.from_version, number_of_nodes)
+        cluster.start()
+
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            c = conn.cursor()
+
+            number_of_shards = random.randint(1, 5)
+            number_of_replicas = random.randint(0, 1)
+
+            c.execute(
+                '''create table doc.test(x int) clustered into ? shards with(
+                    "number_of_replicas" = ?,
+                    "soft_deletes.enabled" = false,
+                    "allocation.max_retries" = 0,
+                    "unassigned.node_left.delayed_timeout" = '100ms'
+                    )''',
+                (number_of_shards, number_of_replicas,))
+
+            number_of_docs = random.randint(0, 10)
+            if number_of_docs > 0:
+                insert_data(conn, 'doc', 'test', number_of_docs)
+
+            if random.choice([True, False]):
+                c.execute('refresh table doc.test')
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
+            # upgrade to a mixed cluster
+            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+
+            #  trigger a primary relocation by excluding the primary from this index
+            c.execute('''select node['id'] from sys.shards where primary=true and table_name='test' ''')
+            primary_id = c.fetchall()
+            self.assertTrue(primary_id)
+            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', primary_id)
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+
+            # upgrade fully to the new version
+            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
+
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+
+    def _assert_ensure_peer_recovery_retention_leases_renewed_and_synced(self, conn, schema_name, table_name):
+        c = conn.cursor()
+        c.execute('''select seq_no_stats['global_checkpoint'],
+                             seq_no_stats['local_checkpoint'],
+                             seq_no_stats['max_seq_no'],
+                             retention_leases['leases']['retaining_seq_no']
+                         from sys.shards
+                         where table_name=? and schema_name=?
+                     ''', (table_name, schema_name))
+        res = c.fetchall()
+        self.assertTrue(res)
+        for r in res:
+            global_checkpoint = r[0]
+            local_checkpoint = r[1]
+            max_seq_no = r[2]
+            retaining_seq_no = r[3]
+            self.assertEqual(global_checkpoint, max_seq_no)
+            self.assertEqual(local_checkpoint, max_seq_no)
+            for r_seq in retaining_seq_no:
+                self.assertEqual(r_seq, global_checkpoint + 1)
