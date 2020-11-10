@@ -662,6 +662,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             # upgrade to a mixed cluster
             self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             #  trigger a primary relocation by excluding the primary from this index
             c.execute('''select node['id'] from sys.shards where primary=true and table_name='test' ''')
