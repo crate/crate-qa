@@ -226,4 +226,9 @@ pipeline {
       }
     }
   }
+  post {
+    cleanup {
+      deleteDir()  /* clean up our workspace */
+    }
+  }
 }
