@@ -44,9 +44,15 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self.assertEqual(expected_count, number_of_docs[0])
 
     def _assert_is_green(self, conn, schema, table_name):
+        return self._assert_health_is(conn, schema, table_name, 'green')
+
+    def _assert_is_yellow(self, conn, schema, table_name):
+        return self._assert_health_is(conn, schema, table_name, 'yellow')
+
+    def _assert_health_is(self, conn: connect, schema: str, table_name: str, health: str):
         c = conn.cursor()
         c.execute('select health from sys.health where table_name=? and table_schema=?', (table_name, schema))
-        self.assertEqual(c.fetchone()[0], 'GREEN')
+        self.assertEqual(c.fetchone()[0], health.upper())
 
     def _assert_is_closed(self, conn, schema, table_name):
         c = conn.cursor()
@@ -504,76 +510,56 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
     def test_auto_expand_indices_during_rolling_upgrade(self):
         """
-        This test ensure that replicas are auto-expanding according to the
-        allocation filtering rules in every state during a rolling upgrade.
+        This test ensure that allocation filtering rules won't auto-expanding replicas
+        during a rolling upgrade unless all nodes are upgraded to 4.4 (latest).
+
+        See https://github.com/elastic/elasticsearch/pull/50361.
         """
 
-        self._run_upgrade_paths(self._test_auto_expand_indices_during_rolling_upgrade, [UpgradePath('latest-nightly', 'latest-nightly')])
+        # Todo: Change upgrade path once 4.4 is released, pin to_version to 4.4 then.
+        self._run_upgrade_paths(self._test_auto_expand_indices_during_rolling_upgrade, UPGRADE_PATHS_FROM_43)
 
     def _test_auto_expand_indices_during_rolling_upgrade(self, path):
         number_of_nodes = random.randint(3, 5)
         cluster = self._new_cluster(path.from_version, number_of_nodes)
         cluster.start()
 
+        # all nodes without the primary
+        number_of_replicas = number_of_nodes - 1
+        number_of_replicas_with_excluded_node = number_of_replicas - 1
+
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
-            c.execute('''create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" =?)''',
-                      (f'''{random.randint(0, 2)}-all''',))
-
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            # all nodes without the primary
-            number_of_replicas = number_of_nodes - 1
-            number_of_replicas_with_excluded_node = number_of_replicas - 1
-
-            c.execute('''select node['id'] from sys.shards''')
+            c.execute('''select id from sys.nodes''')
             node_ids = c.fetchall()
             self.assertEqual(len(node_ids), number_of_nodes)
 
-            # exclude one node from allocation
+            c.execute('''create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" = ?)''',
+                      (f"0-{number_of_replicas}",))
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
+            # exclude one node from allocation, but this won't have any effect as all nodes are on the old version
             c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
 
-            # check that the replicas expanding automatically
-            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
-
-            # validate that one node is still excluded
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
-
-            # include all nodes again
-            c.execute('alter table doc.test reset ("routing.allocation.exclude._id")')
-
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+            # check that the replicas expanding automatically to all nodes, even that one is excluded
             self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
 
-            # exclude one node from allocation again
-            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
+            # upgrade all nodes but 1, running mixed cluster
+            self._upgrade_cluster(cluster, path.to_version, number_of_nodes - 1)
 
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+            # health is yellow because the replicas are expanded, but one could not be allocated as the node
+            # is excluded by allocation filtering
+            self.assert_busy(lambda: self._assert_is_yellow(conn, 'doc', 'test'))
+
+            # check that the replicas still expanding automatically to all nodes, even that one is excluded
+            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
 
             # upgrade fully to the new version
             self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
 
+            # now that all nodes are on the same version including the path to expand replicas based on the
+            # allocation filtering, replicas are expanded only to 1 and the health is green
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            # validate that one node is still excluded
-            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
-
-            # include all nodes again
-            c.execute('alter table doc.test reset ("routing.allocation.exclude._id")')
-
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
-
-            # exclude one node from allocation again
-            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
-
-            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            # validate that one node is still excluded
             self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
 
     def _assert_number_of_replicas(self, conn, schema, table_name, count):
