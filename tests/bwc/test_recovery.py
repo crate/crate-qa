@@ -373,8 +373,6 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             inserts = [(i, str(random.randint)) for i in range(0, 100)]
             c.executemany('''insert into doc.test(id, data) values (?, ?)''', inserts)
 
-            c.execute('refresh table doc.test')
-
             # upgrade to mixed cluster
             self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
 
@@ -392,7 +390,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 self.assertEqual(result['rowcount'], 1)
 
             if random.choice([True, False]):
-                c.execute('refresh table doc.test')
+                self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             # upgrade fully to the new version
             self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
