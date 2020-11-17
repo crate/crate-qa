@@ -88,6 +88,15 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             new_node = self.upgrade_node(node, version)
             cluster[i] = new_node
 
+    def _upgrade_to_mixed_cluster(self, cluster, version: str) -> None:
+        """
+        Upgrade to a mixed version cluster by upgrading one node.
+        If multiple nodes are upgraded at once, not all shards (replicas) may be able to start (or re-allocate)
+        due to different node version.
+        See also See https://github.com/crate/crate/blob/master/server/src/main/java/org/elasticsearch/cluster/routing/allocation/decider/NodeVersionAllocationDecider.java
+        """
+        self._upgrade_cluster(cluster, version, 1)
+
     def _run_upgrade_paths(self, test, paths):
         for p in paths:
             try:
@@ -122,8 +131,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # make sure that we can index while the replicas are recovering
             c.execute('''alter table doc.test set ("routing.allocation.enable"='primaries')''')
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
+
             c.execute('''alter table doc.test set ("routing.allocation.enable"='all')''')
             # insert data into a mixed cluster
             insert_data(conn, 'doc', 'test', 50)
@@ -181,8 +190,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # will not be promoted)
             c.execute('''alter table doc.test set("routing.allocation.enable"='none')''')
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             c.execute('''select id from sys.nodes order by version['number'] desc limit 1''')
             new_node_id = c.fetchone()[0]
@@ -260,8 +268,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             if random.choice([True, False]):
                 c.execute("refresh table doc.test")
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
@@ -296,8 +303,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             c.execute('alter table doc.test close')
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             self._assert_is_closed(conn, 'doc', 'test')
 
@@ -329,8 +335,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('alter table doc.old_cluster close')
             self._assert_is_closed(conn, 'doc', 'old_cluster')
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             self._assert_is_closed(conn, 'doc', 'old_cluster')
 
@@ -379,8 +384,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             inserts = [(i, str(random.randint)) for i in range(0, 100)]
             c.executemany('''insert into doc.test(id, data) values (?, ?)''', inserts)
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             if random.choice([True, False]):
                 self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
@@ -441,8 +445,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             if num_docs > 0:
                 insert_data(conn, 'doc', 'test', num_docs)
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, self.NUMBER_OF_NODES - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
@@ -544,8 +547,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # check that the replicas expanding automatically to all nodes, even that one is excluded
             self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
 
-            # upgrade all nodes but 1, running mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, number_of_nodes - 1)
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             # health is yellow because the replicas are expanded, but one could not be allocated as the node
             # is excluded by allocation filtering
@@ -600,8 +602,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
-            # upgrade to mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
@@ -644,8 +645,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
-            # upgrade to a mixed cluster
-            self._upgrade_cluster(cluster, path.to_version, random.randint(1, number_of_nodes - 1))
+            self._upgrade_to_mixed_cluster(cluster, path.to_version)
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
             #  trigger a primary relocation by excluding the primary from this index
