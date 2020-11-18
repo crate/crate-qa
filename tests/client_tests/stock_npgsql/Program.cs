@@ -2,12 +2,37 @@ using System.Collections.Generic;
 using System;
 using System.Diagnostics;
 using Npgsql;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace stock_npgsql
 {
     class Program
     {
-        static void Main(string[] args)
+
+        public static async Task TestUnnestAsync(NpgsqlConnection conn)
+        {
+            using var command = new NpgsqlCommand(
+                connection: conn,
+                cmdText: "CREATE TABLE mm.data_table (id int, name text)"
+            );
+            await command.ExecuteNonQueryAsync();
+
+            var records = Enumerable
+                .Range(0, 10)
+                .Select(i => (Id: i, Name: $"My identifier is {i}"))
+                .ToArray();
+
+            command.CommandText = "INSERT INTO mm.data_table (id, name) SELECT * FROM unnest(@i, @n) AS d";
+
+            command.Parameters.Add(new NpgsqlParameter<int[]>("i", records.Select(e => e.Id).ToArray()));
+            command.Parameters.Add(new NpgsqlParameter<string[]>("n", records.Select(e => e.Name).ToArray()));
+
+            await command.ExecuteNonQueryAsync();
+        }
+
+
+        static async Task Main(string[] args)
         {
             string host = args[0]; string port = args[1];
 
@@ -59,6 +84,8 @@ namespace stock_npgsql
                     int value = (int) reader[0];
                     Debug.Assert(value == 10, "first value must be 10, but is " + value);
                 }
+
+                await TestUnnestAsync(conn);
             }
         }
     }
