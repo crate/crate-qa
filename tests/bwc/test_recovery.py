@@ -384,6 +384,10 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             inserts = [(i, str(random.randint)) for i in range(0, 100)]
             c.executemany('''insert into doc.test(id, data) values (?, ?)''', inserts)
 
+            # ensure all shards are active before upgrading a node. otherwise the cluster tries to allocate new
+            # replicas if the upgraded node contained the primary, which will fail due to node version allocation rules.
+            self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+
             self._upgrade_to_mixed_cluster(cluster, path.to_version)
 
             if random.choice([True, False]):
