@@ -1,12 +1,10 @@
 const fs = require('fs').promises
-const csv = require('async-csv');
 const expect = require('chai').expect;
 const path = require('path');
 
 const cratedb = require('./db');
 
 
-const dataFile = path.resolve(path.dirname(require.main.filename), 'resources/log_entries.csv');
 const batchSize = 10;
 const expectedRowCount = 10;        // wc -l log_entries.csv minus one for the header
 const expectedUpdatedRowCount = 4;  // grep ",0$" log_entries.csv | wc -l
@@ -14,54 +12,38 @@ const expectedUpdatedRowCount = 4;  // grep ",0$" log_entries.csv | wc -l
 
 async function run() {
 
-    const data = await load_csv(dataFile);
-
+    // Set up a ephemeral database table.
     let testTableName = await cratedb.setup_table();
 
-    let startLoadTs = Date.now();
-    let inserts = cratedb.generateInserts(testTableName, data, batchSize);
-    for (let i=0; i < inserts.length; i++) {
-        await cratedb.execute(inserts[i]);
-    }
+    // Invoke the `INSERT` statement.
+    await cratedb.execute(get_insert(testTableName));
+
+    // Make sure the `INSERT` is synchronized.
     await cratedb.execute(`REFRESH TABLE ${testTableName};`);
 
+    // Check the outcome.
     return check_data(testTableName)
 
 }
 
+function get_insert(tablename) {
 
-async function load_csv(filePath, sep, callback) {
+    return `
+        INSERT INTO ${tablename}
+            (log_time,client_ip,request,status_code,object_size)
+            VALUES
+            ('2012-01-01T00:00:00Z','25.152.171.147','/books/Six_Easy_Pieces.html',404,271),
+            ('2012-01-01T00:00:03Z','243.180.100.114','/slideshow/1.jpg',304,0),
+            ('2012-01-01T00:00:03Z','149.60.38.76','/courses/cs100/finalprojects/adventure/javadocs_/index.html?index-filesindex-16.html',200,705),
+            ('2012-01-01T00:00:10Z','243.180.100.114','/slideshow/2.jpg',304,0),
+            ('2012-01-01T00:00:11Z','134.121.15.97','/courses/cs101/old/2002/syllabus.html',404,277),
+            ('2012-01-01T00:00:17Z','243.180.100.114','/slideshow/3.jpg',304,0),
+            ('2012-01-01T00:00:17Z','252.202.20.160','/degrees/masters/',200,3233),
+            ('2012-01-01T00:00:17Z','252.202.20.160','/degrees/masters/masters.gif',200,7921),
+            ('2012-01-01T00:00:18Z','149.60.38.76','/people/wvv/marron/',200,1642),
+            ('2012-01-01T00:00:18Z','134.121.15.97','/about/rooms/345/',304,0);
+    `
 
-    const csvString = await fs.readFile(filePath, "utf-8");
-    const results = await csv.parse(csvString, { columns: true });
-
-    if (results) {
-        let colNames = getkeys(results[0]);
-        results['colNames'] = colNames;
-        results['getValues'] = (i) => {
-            let values = [];
-            let row = results[i];
-            for (let j=0; j < colNames.length; j++) {
-                let cn = colNames[j]
-                values.push(row[cn]);
-            }
-            return values;
-        };
-    }
-
-    return results;
-
-}
-
-
-function getkeys(obj) {
-    let keys = [];
-    for (let k in obj) {
-        if (obj.hasOwnProperty(k)) {
-            keys.push(k);
-        }
-    }
-    return keys;
 }
 
 
