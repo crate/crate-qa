@@ -1,12 +1,20 @@
 const cratedb = require('./db');
-const test_csv_import = require('./test_csv_import');
+const test_insert_multivalue = require('./test_insert_multivalue');
 
 
 async function main(hostname, port) {
 
     cratedb.create_pool(hostname, port)
 
-    test_csv_import.run().finally(() => {
+    test_insert_multivalue.run()
+    .then(() => {
+    	console.log("Success")
+    })
+    .catch((error) => {
+    	console.log("Error")
+    	throw error
+    })
+    .finally(() => {
         cratedb.teardown_pool();
     })
 
