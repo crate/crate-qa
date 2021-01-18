@@ -4,13 +4,18 @@ CrateDB client tests (node-postgres)
 
 A nodejs_ application showcasing a test interaction with **CrateDB**.
 
-Staring the node-postgres_ module as middleware.
+Starting the node-postgres_ module as middleware.
 
 Run it like:
 
 - `npm install` (required once, to fetch the dependencies)
-- `node app.js <host> <port>` (requires **CrateDB** to be running on <host>:<port>).
+- `node main.js <host> <port>` (requires **CrateDB** to be running on <host>:<port>).
 - `./run.sh` (takes care of running **CrateDB** by means of cr8_).
+
+When running CrateDB through Docker, try::
+
+	docker run -it --rm --publish 5432:5432 crate:4.3.3
+	node main.js localhost 5432
 
 
 .. _nodejs: https://nodejs.org/en/

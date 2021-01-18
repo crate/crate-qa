@@ -1,32 +1,49 @@
-
+const uuid = require('uuid/v4');
 const Pool = require('pg').Pool;
-const pgClientPool = new Pool({
-    user: 'crate',
-    password: '',
-    host: process.argv.length === 4 ? process.argv[2] : 'localhost',
-    port: process.argv.length === 4 ? process.argv[3] : 5432
-});
+let pgClientPool
 
 
-async function endPool() {
-    await pgClientPool.end();
-}
+function create_pool(hostname, port) {
 
-
-function executeAsync(sql, callback) {
-    pgClientPool.query(sql, (error, resultSet) => {
-        if (error) {
-            console.error(`The horror: ${error}`);
-            throw error;
-        }
-        callback(collect(resultSet));
+    pgClientPool = new Pool({
+        user: 'crate',
+        password: '',
+        host: hostname,
+        port: port
     });
+
 }
 
 
-async function execute(sql) {
+async function teardown_pool() {
+    return pgClientPool.end();
+}
+
+
+async function connect() {
+    return pgClientPool.connect();
+}
+
+
+async function setup_table() {
+    let id = uuid().substring(0, 16);
+    let testTableName = `"doc"."tmp_table_${id}"`;
+    await execute(
+        `CREATE TABLE ${testTableName} (` +
+        '        log_time timestamp NOT NULL,' +
+        '        client_ip ip NOT NULL,' +
+        '        request string NOT NULL,' +
+        '        status_code short NOT NULL,' +
+        '        object_size long NOT NULL);'
+    )
+    return testTableName;
+}
+
+
+
+function execute(sql) {
     try {
-        await pgClientPool.query(sql);
+        return pgClientPool.query(sql);
     } catch (error) {
         console.error(`The horror: ${error}`);
         throw error;
@@ -93,13 +110,15 @@ function minusDelimiter(text) {
 
 
 function generateInsert(tableName, colNames, values) {
-    return `INSERT INTO ${tableName}(${colNames}) VALUES${minusDelimiter(values)};`;
+    return `INSERT INTO ${tableName} (${colNames}) VALUES ${minusDelimiter(values)};`;
 }
 
 
 module.exports = {
+    create_pool,
+    teardown_pool,
+    connect,
+    setup_table,
     execute,
-    executeAsync,
     generateInserts,
-    endPool
 };
