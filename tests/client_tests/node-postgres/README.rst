@@ -15,7 +15,7 @@ Run it like:
 When running CrateDB through Docker, try::
 
 	docker run -it --rm --publish 5432:5432 crate:4.3.3
-	node main.js localhost 5432
+	node --trace-warnings main.js localhost 5432
 
 
 .. _nodejs: https://nodejs.org/en/
