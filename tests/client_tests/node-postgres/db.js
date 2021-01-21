@@ -30,20 +30,20 @@ async function setup_table() {
     let testTableName = `"doc"."tmp_table_${id}"`;
     await execute(
         `CREATE TABLE ${testTableName} (` +
-        '        log_time timestamp NOT NULL,' +
-        '        client_ip ip NOT NULL,' +
-        '        request string NOT NULL,' +
-        '        status_code short NOT NULL,' +
-        '        object_size long NOT NULL);'
+        '        log_time timestamp,' +
+        '        client_ip ip,' +
+        '        request string,' +
+        '        status_code short,' +
+        '        object_size long);'
     )
     return testTableName;
 }
 
 
 
-function execute(sql) {
+function execute(sql, parameters) {
     try {
-        return pgClientPool.query(sql);
+        return pgClientPool.query(sql, parameters);
     } catch (error) {
         console.error(`The horror: ${error}`);
         throw error;

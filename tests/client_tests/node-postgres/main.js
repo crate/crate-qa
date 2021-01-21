@@ -1,22 +1,43 @@
 const cratedb = require('./db');
-const test_insert_multivalue = require('./test_insert_multivalue');
 
 
 async function main(hostname, port) {
 
+    // TODO: Introduce a real test framework, see `backlog.rst`.
+
     cratedb.create_pool(hostname, port)
 
-    test_insert_multivalue.run()
-    .then(() => {
-    	console.log("Success")
-    })
-    .catch((error) => {
-    	console.log("Error")
-    	throw error
-    })
-    .finally(() => {
+    // Define test cases. They will be executed in parallel
+    // as the current structure doesn't impose any sequential
+    // execution constraints.
+    let testnames = [
+        'test_insert_multivalue',
+        'test_parameterized_timestamp',
+    ];
+
+    let promises = [];
+    for (const testname of testnames) {
+        const testcase = require(`./${testname}`);
+        promises.push(new Promise(function(resolve, reject) {
+            testcase.run()
+                .then(() => {
+                    console.log(`SUCCESS: ${testname}`)
+                })
+                .catch((error) => {
+                    console.log(`ERROR:   ${testname}`)
+                    throw error
+                })
+                .finally(() => {
+                    resolve();
+                })
+        }));
+    }
+
+    // This synchronizes all test steps and will only tear down
+    // the client pool after all steps have finished.
+    Promise.all(promises).finally(() => {
         cratedb.teardown_pool();
-    })
+    });
 
 }
 
