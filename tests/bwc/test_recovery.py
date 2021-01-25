@@ -8,8 +8,8 @@ from random import sample
 
 from crate.qa.tests import NodeProvider, insert_data, UpgradePath
 
-UPGRADE_PATHS = [UpgradePath('4.2.x', '4.3.x'), UpgradePath('4.3.x', 'latest-nightly')]
-UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', 'latest-nightly')]
+UPGRADE_PATHS = [UpgradePath('4.2.x', '4.3.x'), UpgradePath('4.3.x', '4.4.0'), UpgradePath('4.4.x', 'latest-nightly')]
+UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', '4.4.x')]
 
 
 class RecoveryTest(NodeProvider, unittest.TestCase):
