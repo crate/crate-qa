@@ -24,10 +24,8 @@ from crate.qa.minio_svr import MinioServer, _is_up
 UPGRADE_PATHS = (
     (
         VersionDef('4.0.x', False, []),
-        VersionDef('4.0', False, []),
         VersionDef('4.1.x', False, []),
         VersionDef('4.2.x', False, []),
-        VersionDef('4.2', False, []),
         VersionDef('4.3.x', False, []),
         VersionDef('4.4.x', False, []),
         VersionDef('latest-nightly', False, [])
