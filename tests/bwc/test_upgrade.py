@@ -517,52 +517,6 @@ protocol = 'http')
             shutil.rmtree(path_data, ignore_errors=True)
 
 
-class SnapshotHeterogeneousNodesCompatibilityTest(SnapshotCompatibilityTest):
-
-    # Versions after > 4.0.8 contains a fix/change that needs to be compatible with <= 4.0.8
-    # See https://github.com/crate/crate/pull/9327
-    VERSIONS = ('4.0.x', '4.0.8', '4.0.8')
-
-    def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when running a cluster with mixed nodes of versions 4.0 and 4.0.8
-        """
-
-        with MinioServer() as minio:
-            t = threading.Thread(target=minio.run)
-            t.daemon = True
-            t.start()
-            wait_until(lambda: _is_up('127.0.0.1', 9000))
-
-            num_docs = 30
-            path_data = 'data_test_heterogeneous_snapshot_compatibility'
-            cluster_settings = {
-                'cluster.name': gen_id(),
-                'path.data': path_data
-            }
-            shutil.rmtree(path_data, ignore_errors=True)
-            cluster = self._new_heterogeneous_cluster(self.VERSIONS, settings=cluster_settings)
-            cluster.start()
-            with connect(cluster.node().http_url, error_trace=True) as conn:
-                c = conn.cursor()
-                c.execute(self.CREATE_REPOSITORY)
-                c.execute(CREATE_ANALYZER)
-                c.execute(CREATE_DOC_TABLE)
-                insert_data(conn, 'doc', 't1', num_docs)
-                c.execute('SELECT COUNT(*) FROM t1')
-                rowcount = c.fetchone()[0]
-                self.assertEqual(rowcount, num_docs)
-                run_selects(c, self.VERSION[-1])
-                c.execute(self.CREATE_SNAPSHOT_TPT.format(1))
-                c.execute(self.DROP_DOC_TABLE)
-                c.execute(self.RESTORE_SNAPSHOT_TPT.format(1))
-                c.execute('SELECT COUNT(*) FROM t1')
-                rowcount = c.fetchone()[0]
-                self.assertEqual(rowcount, num_docs)
-                run_selects(c, self.VERSION[-1])
-            shutil.rmtree(path_data, ignore_errors=True)
-        self._process_on_stop()
-
-
 class ReturningNodesCompatibilityTest(NodeProvider, unittest.TestCase):
 
     VERSIONS = ('4.1.x', '4.2')
