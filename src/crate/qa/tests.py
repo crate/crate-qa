@@ -243,6 +243,7 @@ class NodeProvider:
             s = remove_unsupported_settings(v, s)
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+                'CRATE_DISABLE_GC_LOGGING': '1',
                 'CRATE_HOME': crate_dir,
             }
             e.update(env or {})
