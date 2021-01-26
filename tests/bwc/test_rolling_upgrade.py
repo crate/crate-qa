@@ -5,10 +5,8 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
     UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.0'),
     UpgradePath('4.0.x', '4.1.0'),
     UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.1'),
     UpgradePath('4.1.x', '4.2.x'),
     UpgradePath('4.2.x', '4.3.x'),
     UpgradePath('4.3.x', '4.3.x'),
