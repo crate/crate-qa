@@ -8,7 +8,11 @@ from random import sample
 
 from crate.qa.tests import NodeProvider, insert_data, UpgradePath
 
-UPGRADE_PATHS = [UpgradePath('4.2.x', '4.3.x'), UpgradePath('4.3.x', '4.4.0'), UpgradePath('4.4.x', 'latest-nightly')]
+UPGRADE_PATHS = [
+    UpgradePath('4.2.x', '4.3.x'),
+    UpgradePath('4.3.x', '4.4.0'),
+    UpgradePath('4.4.x', 'latest-nightly')
+]
 UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', '4.4.x')]
 
 
@@ -527,7 +531,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self._run_upgrade_paths(self._test_auto_expand_indices_during_rolling_upgrade, UPGRADE_PATHS_FROM_43)
 
     def _test_auto_expand_indices_during_rolling_upgrade(self, path):
-        number_of_nodes = random.randint(3, 5)
+        number_of_nodes = 3
         cluster = self._new_cluster(path.from_version, number_of_nodes)
         cluster.start()
 
@@ -578,7 +582,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self._run_upgrade_paths(self._test_retention_leases_established_when_promoting_primary, UPGRADE_PATHS_FROM_43)
 
     def _test_retention_leases_established_when_promoting_primary(self, path):
-        number_of_nodes = random.randint(3, 5)
+        number_of_nodes = 3
         cluster = self._new_cluster(path.from_version, number_of_nodes)
         cluster.start()
 
@@ -621,7 +625,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self._run_upgrade_paths(self._test_retention_leases_established_when_relocating_primary, UPGRADE_PATHS_FROM_43)
 
     def _test_retention_leases_established_when_relocating_primary(self, path):
-        number_of_nodes = random.randint(3, 5)
+        number_of_nodes = 3
         cluster = self._new_cluster(path.from_version, number_of_nodes)
         cluster.start()
 
