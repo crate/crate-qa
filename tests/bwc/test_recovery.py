@@ -171,6 +171,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             for node_id in node_ids:
                 self.assert_busy(lambda: self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105))
+        cluster.stop()
 
     def test_relocation_with_concurrent_indexing(self):
         self._run_upgrade_paths(self._test_relocation_with_concurrent_indexing, UPGRADE_PATHS)
@@ -237,6 +238,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             for node_id in node_ids:
                 self._assert_num_docs_by_node_id(conn, 'doc', 'test', node_id[0], 105)
+        cluster.stop()
 
     def _assert_shard_state(self, conn, schema, table_name, node_id, state):
         c = conn.cursor()
@@ -283,6 +285,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 c.execute("refresh table doc.test")
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
+        cluster.stop()
 
     def test_recovery_closed_index(self):
         """
@@ -315,6 +318,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
 
             self._assert_is_closed(conn, 'doc', 'test')
+        cluster.stop()
 
     def test_closed_index_during_rolling_upgrade(self):
         self._run_upgrade_paths(self._test_closed_index_during_rolling_upgrade, UPGRADE_PATHS)
@@ -366,6 +370,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c.execute('alter table doc.upgraded_cluster close')
 
             self._assert_is_closed(conn, 'doc', 'upgraded_cluster')
+        cluster.stop()
 
     def test_update_docs(self):
         """
@@ -420,6 +425,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self.assertEqual(len(res), 100)
             for result in res:
                 self.assertEqual(result['rowcount'], 1)
+        cluster.stop()
 
     def test_operation_based_recovery(self):
         """
@@ -472,6 +478,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 insert_data(conn, 'doc', 'test', num_docs)
 
             self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
+        cluster.stop()
 
     def test_turnoff_translog_retention_after_upgraded(self):
         """
@@ -508,6 +515,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             c.execute('refresh table doc.test')
             self._assert_translog_is_empty(conn, 'doc', 'test')
+        cluster.stop()
 
     def _assert_translog_is_empty(self, conn, schema, table_name):
         c = conn.cursor()
@@ -571,6 +579,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             # allocation filtering, replicas are expanded only to 1 and the health is green
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             self.assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
+        cluster.stop()
 
     def _assert_number_of_replicas(self, conn, schema, table_name, count):
         c = conn.cursor()
@@ -620,6 +629,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+        cluster.stop()
 
     def test_retention_leases_established_when_relocating_primary(self):
         self._run_upgrade_paths(self._test_retention_leases_established_when_relocating_primary, UPGRADE_PATHS_FROM_43)
@@ -670,6 +680,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
 
             self.assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             self.assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
+        cluster.stop()
 
     def _assert_ensure_peer_recovery_retention_leases_renewed_and_synced(self, conn, schema_name, table_name):
         c = conn.cursor()
