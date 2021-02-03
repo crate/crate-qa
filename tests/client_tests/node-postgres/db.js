@@ -1,9 +1,17 @@
 const uuid = require('uuid/v4');
-const Pool = require('pg').Pool;
 let pgClientPool
 
 
-function create_pool(hostname, port) {
+function create_pool(hostname, port, use_native=false) {
+
+    let pg;
+    if (!use_native) {
+        pg = require('pg');
+    } else {
+        pg = require('pg').native;
+    }
+
+    const Pool = pg.Pool;
 
     pgClientPool = new Pool({
         user: 'crate',

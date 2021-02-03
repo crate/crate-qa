@@ -5,7 +5,19 @@ async function main(hostname, port) {
 
     // TODO: Introduce a real test framework, see `backlog.rst`.
 
-    cratedb.create_pool(hostname, port)
+    for (const use_native of [false, true]) {
+        await suite(hostname, port, use_native);
+    }
+
+}
+
+async function suite(hostname, port, use_native) {
+
+    // For signaling which driver variant has been used.
+    let variant_label = `native: ${use_native}`;
+
+    // Create a database pool handle.
+    cratedb.create_pool(hostname, port, use_native)
 
     // Define test cases. They will be executed in parallel
     // as the current structure doesn't impose any sequential
@@ -15,17 +27,18 @@ async function main(hostname, port) {
         'test_parameterized_timestamp',
     ];
 
+    // Run test cases.
     let promises = [];
     for (const testname of testnames) {
         const testcase = require(`./${testname}`);
         promises.push(new Promise(function(resolve, reject) {
             testcase.run()
                 .then(() => {
-                    console.log(`SUCCESS: ${testname}`)
+                    console.log(`SUCCESS [${variant_label}]: ${testname}`)
                 })
                 .catch((error) => {
-                    console.log(`ERROR:   ${testname}`)
-                    throw error
+                    console.log(`ERROR   [${variant_label}]: ${testname}`)
+                    console.trace(error);
                 })
                 .finally(() => {
                     resolve();
@@ -35,8 +48,8 @@ async function main(hostname, port) {
 
     // This synchronizes all test steps and will only tear down
     // the client pool after all steps have finished.
-    Promise.all(promises).finally(() => {
-        cratedb.teardown_pool();
+    return Promise.all(promises).finally(async() => {
+        await cratedb.teardown_pool();
     });
 
 }
