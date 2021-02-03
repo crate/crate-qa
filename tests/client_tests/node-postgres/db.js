@@ -38,11 +38,11 @@ async function setup_table() {
     let testTableName = `"doc"."tmp_table_${id}"`;
     await execute(
         `CREATE TABLE ${testTableName} (` +
-        '        log_time timestamp,' +
-        '        client_ip ip,' +
-        '        request string,' +
-        '        status_code short,' +
-        '        object_size long);'
+        '        log_time TIMESTAMP,' +
+        '        client_ip IP,' +
+        '        request STRING,' +
+        '        status_code SHORT,' +
+        '        object_size LONG)'
     )
     return testTableName;
 }
