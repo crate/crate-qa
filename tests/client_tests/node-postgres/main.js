@@ -1,57 +1,26 @@
-const cratedb = require('./db');
+// Add local `lib` folder to list of module search paths.
+// https://gist.github.com/branneman/8048520
+require.main.paths.push(`${__dirname}/lib`);
+
+const eartest = require('eartest');
+
+
+// Define test cases. They will be executed asynchronously,
+// so please be aware that the current test runner doesn't
+// impose any sequential execution constraints.
+const testfiles = [
+    `${__dirname}/tests/test_insert_multivalue`,
+    `${__dirname}/tests/test_parameterized_timestamp`,
+];
 
 
 async function main(hostname, port) {
-
-    // TODO: Introduce a real test framework, see `backlog.rst`.
-
-    for (const use_native of [false, true]) {
-        await suite(hostname, port, use_native);
+    const suite = new eartest.EarTest(hostname, port);
+    await suite.run(testfiles);
+    console.info("Overall success:", suite.success);
+    if (!suite.success) {
+        process.exit(1);
     }
-
-}
-
-async function suite(hostname, port, use_native) {
-
-    // For signaling which driver variant has been used.
-    let variant_label = `native: ${use_native}`;
-
-    // Create a database pool handle.
-    cratedb.create_pool(hostname, port, use_native)
-
-    // Define test cases. They will be executed in parallel
-    // as the current structure doesn't impose any sequential
-    // execution constraints.
-    let testnames = [
-        'test_insert_multivalue',
-        'test_parameterized_timestamp',
-    ];
-
-    // Run test cases.
-    let promises = [];
-    for (const testname of testnames) {
-        const testcase = require(`./${testname}`);
-        promises.push(new Promise(function(resolve, reject) {
-            testcase.run()
-                .then(() => {
-                    console.log(`SUCCESS [${variant_label}]: ${testname}`)
-                })
-                .catch((error) => {
-                    console.log(`ERROR   [${variant_label}]: ${testname}`)
-                    console.trace(error);
-                })
-                .finally(() => {
-                    resolve();
-                })
-        }));
-    }
-
-    // This synchronizes all test steps and will only tear down
-    // the client pool after all steps have finished.
-    return Promise.all(promises).finally(async() => {
-        await cratedb.teardown_pool();
-    });
-
 }
 
 

@@ -1,4 +1,5 @@
-const cratedb = require('./db');
+// TODO: Modularize this.
+const cratedb = require.main.require('db');
 
 const expect = require('chai').expect;
 
