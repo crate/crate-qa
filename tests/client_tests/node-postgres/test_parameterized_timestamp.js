@@ -19,7 +19,7 @@ async function run() {
 
     // Invoke the `INSERT` statement.
     await cratedb.execute(
-        `INSERT INTO ${testTableName} ("log_time") VALUES ($1);`,
+        `INSERT INTO ${testTableName} ("log_time") VALUES ($1)`,
         ['2021-01-13T14:37:17.25988Z']
     );
 

@@ -1,11 +1,7 @@
-const fs = require('fs').promises
-const expect = require('chai').expect;
-const path = require('path');
-
 const cratedb = require('./db');
 
+const expect = require('chai').expect;
 
-const batchSize = 10;
 const expectedRowCount = 10;        // wc -l log_entries.csv minus one for the header
 const expectedUpdatedRowCount = 4;  // grep ",0$" log_entries.csv | wc -l
 
