@@ -4,7 +4,7 @@ const cratedb = require.main.require('db');
 const chai = require('chai');
 chai.use(require('chai-datetime'));
 
-const expect = chai.expect;
+const assert = chai.assert;
 
 
 async function run() {
@@ -33,10 +33,10 @@ async function run() {
     if (!data) {
         throw new Error('expected data, got nothing back');
     }
-    expect(data).to.have.lengthOf(1);
-    expect(data[0]).to.have.property('log_time');
-    expect(data[0]['log_time']).to.be.a('Date');
-    expect(data[0]['log_time']).to.equalDate(new Date('2021-01-13T14:37:17.25988Z'));
+    assert.lengthOf(data, 1);
+    assert.property(data[0], 'log_time');
+    assert.typeOf(data[0]['log_time'], 'Date');
+    assert.equalDate(data[0]['log_time'], new Date('2021-01-13T14:37:17.25988Z'));
 
 }
 
