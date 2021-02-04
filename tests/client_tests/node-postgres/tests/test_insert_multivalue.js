@@ -1,7 +1,7 @@
 // TODO: Modularize this.
 const cratedb = require.main.require('db');
 
-const expect = require('chai').expect;
+const assert = require('chai').assert;
 
 const expectedRowCount = 10;        // wc -l log_entries.csv minus one for the header
 const expectedUpdatedRowCount = 4;  // grep ",0$" log_entries.csv | wc -l
@@ -54,13 +54,13 @@ async function check_data(testTableName) {
     if (!data) {
         throw new Error('expected data, got nothing back');
     }
-    expect(data).to.have.lengthOf(expectedRowCount);
+    assert.lengthOf(data, expectedRowCount);
     let i = Math.floor(Math.random() * expectedRowCount);
-    expect(data[i]).to.have.property('log_time');
-    expect(data[i]).to.have.property('client_ip');
-    expect(data[i]).to.have.property('request');
-    expect(data[i]).to.have.property('status_code');
-    expect(data[i]).to.have.property('object_size');
+    assert.property(data[i], 'log_time');
+    assert.property(data[i], 'client_ip');
+    assert.property(data[i], 'request');
+    assert.property(data[i], 'status_code');
+    assert.property(data[i], 'object_size');
 
     response = await cratedb.execute(`update ${testTableName} set object_size = 40 where object_size=0 returning *;`)
     data = response.rows
@@ -68,9 +68,9 @@ async function check_data(testTableName) {
         throw new Error('expected data, got nothing back');
     }
     let updateCount = data.filter((row) => row['object_size'] == 40);
-    expect(updateCount).to.have.lengthOf(expectedUpdatedRowCount);
+    assert.lengthOf(updateCount, expectedUpdatedRowCount);
     let zeroCount = data.filter((row) => row['object_size'] == 0);
-    expect(zeroCount).to.have.lengthOf(0);
+    assert.lengthOf(zeroCount, 0);
     await cratedb.execute(`DROP TABLE ${testTableName};`)
 }
 
