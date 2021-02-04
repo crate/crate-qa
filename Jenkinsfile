@@ -3,6 +3,9 @@ pipeline {
   environment {
     JDK_11 = 'openjdk@1.11.0'
   }
+  options {
+    timeout(time: 4, unit: 'HOURS') 
+  }
   stages {
     stage('Parallel') {
       parallel {
