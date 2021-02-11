@@ -1,3 +1,26 @@
+"""
+About
+=====
+Test cases for CrateDB using `asyncpg`.
+
+Usage
+=====
+Normally, this will be executed through the main Python test suite
+triggered through the toplevel `Jenkinsfile`.
+
+However, to run the `asyncpg` tests only, for example on a CrateDB
+instance already provided through Docker, there's an alternative
+option which goes along like this::
+
+    # Run CrateDB.
+    docker run -it --rm --publish=5432:5432 crate/crate:nightly
+
+    # Run test suite.
+    export CRATEDB_URI=postgres://crate@localhost:5432/doc
+    python -m unittest discover -vvvf -s tests/client_tests -k test_asyncpg
+
+"""
+import os
 import asyncio
 import asyncpg
 import unittest
@@ -48,9 +71,8 @@ async def record_type_can_be_read_using_binary_streaming(test, conn):
     test.assertEqual(keyword, ('add', 'R', 'reserved'))
 
 
-async def fetch_summits(test, host, port):
-    conn = await asyncpg.connect(
-        host=host, port=port, user='crate', database='doc')
+async def fetch_summits(test, uri):
+    conn = await asyncpg.connect(uri)
     async with conn.transaction():
         cur = await conn.cursor(
             'select mountain from sys.summits order by height desc')
@@ -62,8 +84,8 @@ async def fetch_summits(test, host, port):
     test.assertEqual(fourth['mountain'], 'Liskamm')
 
 
-async def exec_queries_pooled(test, hosts):
-    pool = await asyncpg.create_pool(f'postgres://crate@{hosts}/doc')
+async def exec_queries_pooled(test, uri):
+    pool = await asyncpg.create_pool(uri)
     async with pool.acquire() as conn:
         await basic_queries(test, conn)
         await record_type_can_be_read_using_binary_streaming(test, conn)
@@ -71,18 +93,24 @@ async def exec_queries_pooled(test, hosts):
 
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):
 
+    def ensure_cratedb(self):
+        if "CRATEDB_URI" in os.environ:
+            crate_psql_url = os.environ["CRATEDB_URI"]
+        else:
+            (node, _) = self._new_node(self.CRATE_VERSION)
+            node.start()
+            psql_addr = node.addresses.psql
+            crate_address = f'{psql_addr.host}:{psql_addr.port}'
+            crate_psql_url = f'postgres://crate@{crate_address}/doc'
+        return crate_psql_url
+
     def test_basic_statements(self):
-        (node, _) = self._new_node(self.CRATE_VERSION)
-        node.start()
+        crate_psql_url = self.ensure_cratedb()
         loop = asyncio.get_event_loop()
-        psql_addr = node.addresses.psql
-        crate_psql_url = f'{psql_addr.host}:{psql_addr.port}'
         loop.run_until_complete(exec_queries_pooled(self, crate_psql_url))
 
     def test_result_streaming_using_fetch_size(self):
-        (node, _) = self._new_node(self.CRATE_VERSION)
-        node.start()
+        crate_psql_url = self.ensure_cratedb()
         loop = asyncio.get_event_loop()
-        psql_addr = node.addresses.psql
         loop.run_until_complete(
-            fetch_summits(self, psql_addr.host, psql_addr.port))
+            fetch_summits(self, crate_psql_url))
