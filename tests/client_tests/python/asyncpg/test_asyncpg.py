@@ -54,6 +54,30 @@ async def binary_streaming(test, conn):
     test.assertEqual(keyword, ('add', 'R', 'reserved'))
 
 
+async def geopoint_roundtrip(test, conn):
+    """
+    Verify that roundtripping GEO_POINT types works (2021-02-11).
+    """
+
+    # Create table.
+    await conn.execute("DROP TABLE IF EXISTS testdrive; "
+                       "CREATE TABLE testdrive (place GEO_POINT);")
+
+    # Insert a GEO_POINT.
+    await conn.execute("INSERT INTO testdrive (place) VALUES "
+                       "(CAST('POINT(-98.9109537 19.6389474)' AS GEO_POINT));")
+
+    # Flush data.
+    await conn.execute("REFRESH TABLE testdrive;")
+
+    # Query data.
+    result = await conn.fetch("SELECT * FROM testdrive;")
+
+    # Compare data.
+    point = result[0]["place"]
+    test.assertEqual([point.x, point.y], [-98.9109537, 19.6389474])
+
+
 async def fetch_summits(test, host, port):
     conn = await asyncpg.connect(
         host=host, port=port, user='crate', database='doc')
@@ -73,6 +97,7 @@ async def exec_queries_pooled(test, hosts):
     async with pool.acquire() as conn:
         await basic_queries(test, conn)
         await binary_streaming(test, conn)
+        await geopoint_roundtrip(test, conn)
 
 
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):
