@@ -689,5 +689,6 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             retaining_seq_no = r[3]
             self.assertEqual(global_checkpoint, max_seq_no)
             self.assertEqual(local_checkpoint, max_seq_no)
+            self.assertIsNotNone(retaining_seq_no)
             for r_seq in retaining_seq_no:
                 self.assertEqual(r_seq, global_checkpoint + 1)
