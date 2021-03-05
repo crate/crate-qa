@@ -15,7 +15,7 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
             c.execute('CREATE TABLE tbl (x int)')
             c.execute('INSERT INTO tbl (x) values (?)', (10,))
         major, feature, hotfix = node.version
-        for i in range(hotfix, 0, -1):
+        for i in range(hotfix, -1, -1):
             new_version = (major, feature, i)
             with self.subTest(version=new_version):
                 node = self.upgrade_node(node, '.'.join(map(str, new_version)))
