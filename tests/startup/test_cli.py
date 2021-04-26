@@ -23,7 +23,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'node.name': self.fake.name(),
             'cluster.name': self.fake.bothify(text='????.##'),
         }
-        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
@@ -45,7 +45,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'path.logs': self.mkdtemp(),
             'cluster.name': 'crate',
         }
-        (node, _) = self._new_node(self.CRATE_VERSION, settings=settings)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
         with connect(node.http_url, error_trace=True) as conn:
             cur = conn.cursor()
@@ -79,8 +79,8 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'auth.host_based.config.0.protocol': 'http',
         })
 
-        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
-        v = version_tuple_to_strict_version(version_tuple)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        v = version_tuple_to_strict_version(node.version)
         if v >= V('4.0.0'):
             # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
             return
@@ -120,8 +120,8 @@ class StartupTest(NodeProvider, unittest.TestCase):
             'license.enterprise': False,
         })
 
-        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
-        v = version_tuple_to_strict_version(version_tuple)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
+        v = version_tuple_to_strict_version(node.version)
         if v >= V('4.0.0'):
             # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
             return
@@ -163,7 +163,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
         log_file_path = Path(tmp_home, 'crate.log')
         self.create_log_from_template(log_file_path, tmp_home)
 
-        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
+        node = self._new_node(self.CRATE_VERSION, settings=settings)
         node.start()
 
         # Check entries in log file
@@ -185,7 +185,7 @@ class StartupTest(NodeProvider, unittest.TestCase):
                         line_ctx,
                         rf'node name \[{node_name}\], node ID \[.+\]\n')
                 elif lineIdx == 3:
-                    version_str = '.'.join([str(v) for v in version_tuple])
+                    version_str = '.'.join([str(v) for v in node.version])
                     self.assertRegex(
                         line_ctx,
                         rf'version\[{version_str}(-SNAPSHOT)?\], pid\[\d+\], build\[.+\], OS\[.+\], JVM\[.+\]')

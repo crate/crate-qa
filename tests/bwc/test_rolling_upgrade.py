@@ -65,7 +65,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             expected_active_shards += shards
 
         for idx, node in enumerate(cluster):
-            new_node = self.upgrade_node(node, path.to_version)
+            new_node = cluster.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()

@@ -23,7 +23,7 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
         for i in range(hotfix, -1, -1):
             new_version = (major, feature, i)
             with self.subTest(version=new_version):
-                node = self.upgrade_node(node, '.'.join(map(str, new_version)))
+                node = cluster.upgrade_node(node, '.'.join(map(str, new_version)))
 
                 with connect(node.http_url, error_trace=True) as conn:
                     c = conn.cursor()

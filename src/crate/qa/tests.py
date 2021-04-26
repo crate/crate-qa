@@ -15,6 +15,7 @@ from glob import glob
 from cr8.run_crate import CrateNode, get_crate, _extract_version
 from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
 from cr8.insert_json import to_insert
+from crate.client import connect
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 CRATEDB_0_57 = V('0.57.0')
@@ -123,6 +124,22 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
         print('-' * 70)
     raise TimeoutError(f"Shards {num_active} didn't become active within {timeout}s.")
 
+def assert_busy(assertion, timeout=120, f=2.0):
+    waited = 0
+    duration = 0.1
+    assertion_error = None
+    while waited < timeout:
+        try:
+            assertion()
+            return
+        except AssertionError as e:
+            assertion_error = e
+        time.sleep(duration)
+        waited += duration
+        duration *= f
+    raise assertion_error
+
+
 
 class VersionDef(NamedTuple):
     version: str
@@ -132,8 +149,18 @@ class VersionDef(NamedTuple):
 
 class CrateCluster:
 
-    def __init__(self, nodes=[]):
-        self._nodes = nodes
+    CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
+    DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
+
+    def __init__(self, path_data):
+        self._nodes = []
+        self._path_data = path_data
+        self._log_consumers = []
+
+    def add(self,  version, node_names=[], settings=None, env=None) -> CrateNode:
+        node = self._new_node( version, node_names, settings, env);
+        self._nodes.append(node)
+        return node
 
     def start(self):
         threads = []
@@ -147,156 +174,161 @@ class CrateCluster:
         for node in self._nodes:
             node.stop()
 
-    def node(self):
+    def node(self) -> CrateNode:
         return random.choice(self._nodes)
 
-    def __next__(self):
-        return next(self._nodes)
-
-    def __setitem__(self, idx, node):
-        self._nodes[idx] = node
-
-    def __getitem__(self, idx):
-        return self._nodes[idx]
-
-
-class NodeProvider:
-
-    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
-    CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
-    DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
-
-    def __init__(self, *args, **kwargs):
-        self.tmpdirs = []
-        super().__init__(*args, **kwargs)
-
-    def mkdtemp(self, *args):
-        tmp = tempfile.mkdtemp()
-        self.tmpdirs.append(tmp)
-        return os.path.join(tmp, *args)
-
-    def _unicast_hosts(self, num, transport_port=4300):
-        return ','.join([
-            '127.0.0.1:' + str(transport_port + x)
-            for x in range(num)
-        ])
-
-    def _new_cluster(self, version, num_nodes, settings=None, env=None):
-        self.assertTrue(hasattr(self, '_new_node'))
-        settings = settings or {}
-        for port in ['transport.tcp.port', 'http.port', 'psql.port']:
-            self.assertNotIn(port, settings)
-        s = {
-            'cluster.name': gen_id(),
-            'gateway.recover_after_nodes': num_nodes,
-            'gateway.expected_nodes': num_nodes,
-            'node.max_local_storage_nodes': num_nodes,
-        }
-        s.update(settings)
-        nodes = []
-        for id in range(num_nodes):
-            s['node.name'] = s['cluster.name'] + '-' + str(id)
-            nodes.append(self._new_node(version, s, env)[0])
-        return CrateCluster(nodes)
-
-    def _new_heterogeneous_cluster(self, versions, settings=None):
-        self.assertTrue(hasattr(self, '_new_node'))
-        settings = settings or {}
-        for port in ['transport.tcp.port', 'http.port', 'psql.port']:
-            self.assertNotIn(port, settings)
-        num_nodes = len(versions)
-        s = {
-            'cluster.name': gen_id(),
-            'gateway.recover_after_nodes': num_nodes,
-            'gateway.expected_nodes': num_nodes,
-            'node.max_local_storage_nodes': num_nodes,
-        }
-        s.update(settings)
-        nodes = []
-        for i, version in enumerate(versions):
-            s['node.name'] = f"{s['cluster.name']}-{i}"
-            nodes.append(self._new_node(version, s)[0])
-        return CrateCluster(nodes)
-
-    def upgrade_node(self, old_node, new_version):
+    def upgrade_node(self, old_node: CrateNode, new_version) -> CrateNode:
         old_node.stop()
-        self._on_stop.remove(old_node)
-        (new_node, _) = self._new_node(new_version, settings=old_node._settings)
+        self._nodes.remove(old_node)
+        with connect(self.node().http_url, error_trace=True) as conn:
+            assert_busy(lambda: self.ensure_no_reallocation(conn))
+        new_node = self._new_node(new_version, settings=old_node._settings)
         new_node.start()
+        self._nodes.append(new_node)
         return new_node
 
-    def setUp(self):
-        self._path_data = self.mkdtemp()
-        self._on_stop = []
-        self._log_consumers = []
+    def ensure_no_reallocation(self, conn):
+        c = conn.cursor()
+        c.execute("SELECT current_state, explanation FROM sys.allocations"
+                  " WHERE current_state IN ('relocating', 'initializing')")
+        if c.rowcount > 0:
+            res = c.fetchall()
+            raise AssertionError(f'Some shards are still initializing/reallocating: {res}')
 
-        def new_node(version, settings=None, env=None):
-            crate_dir = get_crate(version)
-            version_tuple = _extract_version(crate_dir)
-            v = version_tuple_to_strict_version(version_tuple)
-            s = {
-                'path.data': self._path_data,
-                'cluster.name': 'crate-qa',
-            }
-            s.update(settings or {})
-            s.update(test_settings(v))
-            s = remove_unsupported_settings(v, s)
-            e = {
-                'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
-                'CRATE_DISABLE_GC_LOGGING': '1',
-                'CRATE_HOME': crate_dir,
-            }
-            e.update(env or {})
+    def __next__(self) -> CrateNode:
+        return next(self._nodes)
 
-            if self.DEBUG:
-                print(f'# Running CrateDB {version} ({v}) ...')
-                s_nice = pformat(s)
-                print(f'with settings: {s_nice}')
-                e_nice = pformat(e)
-                print(f'with environment: {e_nice}')
+    def __setitem__(self, idx, node: CrateNode):
+        self._nodes[idx] = node
 
-            n = CrateNode(
-                crate_dir=crate_dir,
-                keep_data=True,
-                settings=s,
-                env=e,
-            )
-            n._settings = s  # CrateNode does not hold its settings
-            self._add_log_consumer(n)
-            self._on_stop.append(n)
-            return (n, version_tuple)
-        self._new_node = new_node
+    def __getitem__(self, idx) -> CrateNode:
+        return self._nodes[idx]
 
-    def tearDown(self):
-        self._crate_logs_on_failure()
-        self._process_on_stop()
-        for tmp in self.tmpdirs:
-            if DEBUG:
-                print(f'# Removing temporary directory {tmp}')
-            shutil.rmtree(tmp, ignore_errors=True)
-        self.tmpdirs.clear()
+    def _new_node(self, version, node_names=[], settings=None, env=None) -> CrateNode:
+        crate_dir = get_crate(version)
+        version_tuple = _extract_version(crate_dir)
+        v = version_tuple_to_strict_version(version_tuple)
+        s = {
+            'path.data': self._path_data,
+            'cluster.name': 'crate-qa',
+        }
+        if len(node_names) > 0 and v >= V('4.0.0'):
+            s['cluster.initial_master_nodes'] = ','.join(node_names)
+            #s['discovery.seed_providers'] = 'file'
+            #s['discovery.seed_hosts'] = '[]'
+        s.update(settings or {})
+        s.update(test_settings(v))
+        s = remove_unsupported_settings(v, s)
+        e = {
+            'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+            'CRATE_DISABLE_GC_LOGGING': '1',
+            'CRATE_HOME': crate_dir,
+        }
+        e.update(env or {})
 
-    def _process_on_stop(self):
-        for n in self._on_stop:
-            n.stop()
-        self._on_stop.clear()
+        if self.DEBUG:
+            print(f'# Running CrateDB {version} ({v}) ...')
+            s_nice = pformat(s)
+            print(f'with settings: {s_nice}')
+            e_nice = pformat(e)
+            print(f'with environment: {e_nice}')
+
+        n = CrateNode(
+            crate_dir=crate_dir,
+            keep_data=True,
+            settings=s,
+            env=e,
+        )
+        n._settings = s  # CrateNode does not hold its settings
+        self._add_log_consumer(n)
+        return n
 
     def _add_log_consumer(self, node: CrateNode):
         lines: List[str] = []
         node.monitor.consumers.append(lines.append)
         self._log_consumers.append((node, lines))
 
+
+class NodeProvider:
+
+    CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
+
+    def __init__(self, *args, **kwargs):
+        self.tmpdirs = []
+        self._cluster = None
+        super().__init__(*args, **kwargs)
+
+    def _new_node(self, version, settings=None, env=None) -> CrateNode:
+        self._cluster = CrateCluster(self._path_data)
+        s = self._apply_default_settings(version, 1, settings)
+        return self._cluster.add(version, [], s, env);
+
+    def _new_cluster(self, version, num_nodes, settings=None, env=None) -> CrateCluster:
+        self._cluster = CrateCluster(self._path_data)
+        s = self._apply_default_settings(version, num_nodes, settings)
+        node_names =  [s['cluster.name'] + '-' + str(id) for id in range(num_nodes)]
+        for id in range(num_nodes):
+            s['node.name'] = node_names[id]
+            self._cluster.add(version, node_names, s, env)
+        return self._cluster
+
+    def _new_heterogeneous_cluster(self, versions, settings=None) -> CrateCluster:
+        self._cluster = CrateCluster(self._path_data)
+        num_nodes = len(versions)
+        s = self._apply_default_settings(version, num_nodes, settings)
+        nodes = []
+        node_names =  [s['cluster.name'] + '-' + str(id) for id in range(num_nodes)]
+        for i, version in enumerate(versions):
+            s['node.name'] = node_names[i]
+            self._cluster.add(version, node_names, s)
+        return self._cluster
+
+    def _apply_default_settings(self, version, num_nodes, settings = None) -> dict:
+        settings = settings or {}
+        for port in ['transport.tcp.port', 'http.port', 'psql.port']:
+            self.assertNotIn(port, settings)
+        s = {
+            'cluster.name': gen_id(),
+            'gateway.recover_after_nodes': num_nodes,
+            'gateway.expected_nodes': num_nodes,
+            'node.max_local_storage_nodes': num_nodes,
+        }
+        s.update(settings)
+        return s
+
+    def setUp(self):
+        self._path_data = self.mkdtemp()
+        if self._cluster is not None:
+            self._cluster.start()
+
+    def tearDown(self):
+        if self._cluster is not None:
+            self._crate_logs_on_failure()
+            self._cluster.stop()
+            self._cluster = None
+        for tmp in self.tmpdirs:
+            if DEBUG:
+                print(f'# Removing temporary directory {tmp}')
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.tmpdirs.clear()
+
+    def mkdtemp(self, *args):
+        tmp = tempfile.mkdtemp()
+        self.tmpdirs.append(tmp)
+        return os.path.join(tmp, *args)
+
     def _crate_logs_on_failure(self):
-        for node, lines in self._log_consumers:
-            node.monitor.consumers.remove(lines.append)
-            if self._has_error():
-                print_error('=' * 70)
-                print_error('CrateDB logs for test ' + self.id())
-                print_error('-' * 70)
-                for line in lines:
-                    print_error(line)
-                print_error('-' * 70)
-        self._log_consumers.clear()
+        if self._cluster is not None:
+            for node, lines in self._cluster._log_consumers:
+                node.monitor.consumers.remove(lines.append)
+                if self._has_error():
+                    print_error('=' * 70)
+                    print_error('CrateDB logs for test ' + self.id())
+                    print_error('-' * 70)
+                    for line in lines:
+                        print_error(line)
+                    print_error('-' * 70)
+            self._cluster._log_consumers.clear()
 
     def _has_error(self) -> bool:
         return any(error for (_, error) in self._outcome.errors)  # type: ignore

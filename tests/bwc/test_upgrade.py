@@ -206,7 +206,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
             container.get(digest)
-        self._process_on_stop()
+        cluster.stop()
 
         for version_def in versions[1:]:
             self.assert_data_persistence(version_def, nodes, digest)
@@ -239,7 +239,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     'INSERT INTO doc.parted (id, version, cols) values (?, ?, ?)',
                     args
                 )
-        self._process_on_stop()
+        cluster.stop()
 
 
 class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
@@ -277,7 +277,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                 LANGUAGE JAVASCRIPT
                 AS 'function fact(a) { return a < 2 ? 0 : a * (a - 1); }';
             ''')
-        self._process_on_stop()
+        cluster.stop()
 
         for version_def in self.SUPPORTED_VERSIONS[1:]:
             self.assert_meta_data(version_def, nodes)
@@ -315,8 +315,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                               ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
                               ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
                              cursor.fetchall())
-
-            self._process_on_stop()
+        cluster.stop()
 
 
 class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
@@ -341,7 +340,7 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("select 1")
-        self._process_on_stop()
+        cluster.stop()
 
         for version_def in self.SUPPORTED_VERSIONS[1:]:
             self.assert_dynamic_string_detection(version_def, nodes)
@@ -372,7 +371,7 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             rs = cursor.fetchall()
             self.assertEqual(['foo', 1], rs[0])
             cursor.execute('DROP TABLE t1')
-            self._process_on_stop()
+        cluster.stop()
 
     def _move_nodes_folder_if_needed(self):
         """Eliminates the cluster-id folder inside the data directory."""
@@ -423,7 +422,7 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute('''
                 INSERT INTO p1 (id, p) VALUES (1, 1);
             ''')
-        self._process_on_stop()
+        cluster.stop()
 
         for version_def in self.SUPPORTED_VERSIONS[1:]:
             self.start_cluster_and_alter_tables(version_def, nodes)
@@ -445,7 +444,7 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute('''
                 ALTER TABLE p1 SET (number_of_replicas=1)
             ''')
-        self._process_on_stop()
+        cluster.stop()
 
 
 class SnapshotCompatibilityTest(NodeProvider, unittest.TestCase):
@@ -512,7 +511,7 @@ protocol = 'http')
                     run_selects(c, version)
                     c.execute(self.CREATE_SNAPSHOT_TPT.format(num_snapshot))
                     c.execute(self.DROP_DOC_TABLE)
-                self._process_on_stop()
+                cluster.stop()
                 prev_version = version
                 num_snapshot += 1
             shutil.rmtree(path_data, ignore_errors=True)
