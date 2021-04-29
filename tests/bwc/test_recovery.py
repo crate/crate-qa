@@ -247,6 +247,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         self.assertTrue(current_state)
         self.assertEqual(current_state[0], state)
 
+    @unittest.skip("https://github.com/crate/crate-qa/issues/196")
     def test_recovery(self):
         """
         This test creates a new table, insert data and asserts the state at every stage of the
