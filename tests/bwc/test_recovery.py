@@ -17,6 +17,7 @@ UPGRADE_PATHS = [
 UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', '4.4.x')]
 
 
+@unittest.skip('Recovery tests are currently flaky, skip them until fixed')
 class RecoveryTest(NodeProvider, unittest.TestCase):
     """
     In depth testing of the recovery mechanism during a rolling restart.
