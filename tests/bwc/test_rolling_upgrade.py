@@ -1,6 +1,6 @@
 import unittest
 from crate.client import connect
-from src.crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
+from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
