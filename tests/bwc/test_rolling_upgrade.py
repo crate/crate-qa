@@ -1,16 +1,9 @@
 import unittest
 from crate.client import connect
-from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
+from src.crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.3.x'),
-    UpgradePath('4.4.x', '4.5.x'),
     UpgradePath('4.5.x', 'branch:mkleen/lucene_persistence'),
 )
 
@@ -65,6 +58,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             expected_active_shards += shards
 
         for idx, node in enumerate(cluster):
+            print(f'--> Upgrade node {idx} to {path.to_version}')
             new_node = self.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
