@@ -4,7 +4,8 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.5.x', 'branch:mkleen/lucene_persistence'),
+    # UpgradePath('4.5.x', 'branch:mkleen/lucene_persistence'),
+    UpgradePath('4.2.x', '4.3.x'),
 )
 
 
