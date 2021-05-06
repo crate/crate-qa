@@ -87,6 +87,8 @@ def insert_data(conn, schema, table, num_rows):
     gen_row = create_row_generator(cols)
     c = conn.cursor()
     c.executemany(stmt, [gen_row() for x in range(num_rows)])
+    if c.rowcount != num_rows:
+        raise AssertionError(f'Fail to insert {num_rows}, only {c.rowcount} rows were written successfully')
     c.execute(f'REFRESH TABLE "{schema}"."{table}"')
 
 
@@ -178,8 +180,13 @@ class CrateCluster:
         return random.choice(self._nodes)
 
     def upgrade_node(self, old_node: CrateNode, new_version) -> CrateNode:
+        time.sleep(1)
+        with connect(self.node().http_url, error_trace=True) as conn:
+            assert_busy(lambda: self.ensure_no_reallocation(conn))
         old_node.stop()
         self._nodes.remove(old_node)
+        for node in self._nodes:
+            print(f'NODE url: {node.http_url}')
         with connect(self.node().http_url, error_trace=True) as conn:
             assert_busy(lambda: self.ensure_no_reallocation(conn))
         new_node = self._new_node(new_version, settings=old_node._settings)
@@ -189,11 +196,11 @@ class CrateCluster:
 
     def ensure_no_reallocation(self, conn):
         c = conn.cursor()
-        c.execute("SELECT current_state, explanation FROM sys.allocations"
-                  " WHERE current_state IN ('relocating', 'initializing')")
+        c.execute("SELECT * FROM sys.shards"
+                  " WHERE state NOT IN ('STARTED', 'UNASSIGNED')")
         if c.rowcount > 0:
             res = c.fetchall()
-            raise AssertionError(f'Some shards are still initializing/reallocating: {res}')
+            raise AssertionError(f'Some shards are still initializing/recovering: {res}')
 
     def __next__(self) -> CrateNode:
         return next(self._nodes)

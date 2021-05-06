@@ -47,6 +47,15 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             print(r)
             print("\n")
 
+    def _debug_shards(self, conn, schema, table_name):
+        c = conn.cursor()
+        c.execute('select * from sys.shards where table_name=? and table_schema=?', (table_name, schema))
+        res = c.fetchall()
+        print("DEBUG: output of sys.shards\n")
+        for r in res:
+            print(r)
+            print("\n")
+
     def _assert_health_is(self, conn: connect, schema: str, table_name: str, health: str):
         c = conn.cursor()
         c.execute('select health from sys.health where table_name=? and table_schema=?', (table_name, schema))
@@ -292,6 +301,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
             except AssertionError as e:
                 self._debug_allocations(conn, 'doc', 'test')
+                self._debug_shards(conn, 'doc', 'test')
                 raise e
 
         # upgrade fully to the new version
