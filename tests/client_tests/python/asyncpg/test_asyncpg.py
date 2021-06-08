@@ -71,6 +71,15 @@ async def record_type_can_be_read_using_binary_streaming(test, conn):
     test.assertEqual(keyword, ('add', 'R', 'reserved'))
 
 
+async def bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn):
+    xs = asyncpg.BitString('0101')
+    await conn.execute('create table tbl_bit (xs bit(4))')
+    await conn.execute('insert into tbl_bit (xs) values (?)', xs)
+    await conn.execute('refresh table tbl_bit')
+    result = await conn.fetch('select xs from tbl_bit')
+    test.assertEqual(result[0][0], xs)
+
+
 async def fetch_summits(test, uri):
     conn = await asyncpg.connect(uri)
     async with conn.transaction():
@@ -89,6 +98,7 @@ async def exec_queries_pooled(test, uri):
     async with pool.acquire() as conn:
         await basic_queries(test, conn)
         await record_type_can_be_read_using_binary_streaming(test, conn)
+        await bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn)
 
 
 class AsyncpgTestCase(NodeProvider, unittest.TestCase):
