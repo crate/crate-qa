@@ -66,7 +66,7 @@ services:
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
       CONNECT_REST_ADVERTISED_HOST_NAME: 'kafka-connect'
       CONNECT_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      CONNECT_PLUGIN_PATH: '/usr/share/java,/etc/kafka-connect/plugins'
+      CONNECT_PLUGIN_PATH: /usr/share/java/,/etc/kafka-connect/jars
 
 
   cratedb:
