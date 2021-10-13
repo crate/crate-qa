@@ -300,3 +300,19 @@ class NodeProvider:
 
     def _has_error(self) -> bool:
         return any(error for (_, error) in self._outcome.errors)  # type: ignore
+
+
+def assert_busy(assertion, timeout=120, f=2.0):
+    waited = 0
+    sleep_interval_sec = 0.1
+    assertion_error = None
+    while waited < timeout:
+        try:
+            assertion()
+            return
+        except AssertionError as e:
+            assertion_error = e
+            time.sleep(sleep_interval_sec)
+            waited += sleep_interval_sec
+            sleep_interval_sec *= f
+    raise assertion_error
