@@ -6,11 +6,6 @@ from crate.client import connect
 
 class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
 
-    @unittest.skip("""
-    This is expected to fail until CrateDB v4.4.4 is out as all
-    versions < 4.4.3 won't fully support hotfix version downgrades.
-    See https://github.com/crate/crate/pull/11103.
-    """)
     def test_latest_testing_can_be_downgraded_within_hotfix_versions(self):
         cluster = self._new_cluster('latest-testing', 2)
         cluster.start()
