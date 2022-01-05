@@ -517,3 +517,82 @@ protocol = 'http')
                 prev_version = version
                 num_snapshot += 1
             shutil.rmtree(path_data, ignore_errors=True)
+
+
+class TranslogPolicyTest(NodeProvider, unittest.TestCase):
+
+    CLUSTER_SETTINGS = {
+        'cluster.name': gen_id(),
+    }
+
+    SUPPORTED_VERSIONS = (
+        # FAILS
+        #VersionDef('3.0.7', False, []),
+        VersionDef('3.0.8', False, []),
+        #VersionDef('3.1.6', False, []),
+
+        # WORKS
+        #VersionDef('3.2.8', False, []),
+        #VersionDef('3.3.6', False, []),
+
+        #VersionDef('4.0.12', False, []),
+        #VersionDef('4.3.4', False, []),
+        VersionDef('4.7.0', False, [])
+        #VersionDef('4.6.6', False, [])
+    )
+
+    def test_recover_replica(self):
+        """  Ensures that we correctly trim unsafe commits when migrating
+        from a translog generation to the sequence number based policy.
+        See https://github.com/elastic/elasticsearch/issues/57091 and
+        https://github.com/crate/crate/issues/11756.
+        """
+
+        nodes = 2
+
+        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
+                                    nodes,
+                                    self.CLUSTER_SETTINGS)
+        cluster.start()
+        numDocs = 0
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE t1 (id int) clustered into 1 shards with (
+                  number_of_replicas=0,
+                  "translog.retention.size"='-1',
+                  "translog.generation_threshold_size"='1kb'
+                );
+            ''')
+            #insert_data(conn, 'doc', 't1', numDocs)
+            #cursor.execute('''
+            #    SELECT * FROM t1
+            #''')
+            #rows = cursor.fetchall()
+            #self.assertEqual(len(rows), numDocs)
+            #cursor.execute("OPTIMIZE TABLE doc.t1")
+
+        #self.restart_cluster_with_version(self.SUPPORTED_VERSIONS[0], nodes, numDocs)
+
+        for version_def in self.SUPPORTED_VERSIONS[1:]:
+            self.restart_cluster_with_version(version_def, nodes, numDocs)
+            self.restart_cluster_with_version(version_def, nodes, numDocs)
+
+    def restart_cluster_with_version(self, version_def, nodes, numDocs):
+        self._process_on_stop()
+        cluster = self._new_cluster(
+            version_def.version,
+            nodes,
+            self.CLUSTER_SETTINGS,
+            prepare_env(version_def.java_home)
+        )
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            cursor = conn.cursor()
+            wait_for_active_shards(cursor, 1)
+            cursor.execute('''
+                SELECT * FROM t1
+            ''')
+            rows = cursor.fetchall()
+            self.assertEqual(len(rows), numDocs)
+        self._process_on_stop()
