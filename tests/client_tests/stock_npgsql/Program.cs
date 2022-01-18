@@ -77,9 +77,45 @@ namespace stock_npgsql
             using (var conn = new NpgsqlConnection(connString)) {
                 conn.Open();
 
-                await TestBasics(conn);
-                await TestUnnestAsync(conn);
-                await TestInsertUsingEntityFramework(conn);
+                // await TestBasics(conn);
+                // await TestUnnestAsync(conn);
+                // await TestInsertUsingEntityFramework(conn);
+                await TestInsertWithDuplicateKeyConflict(conn);
+            }
+        }
+
+        private static async Task TestInsertWithDuplicateKeyConflict(NpgsqlConnection conn)
+        {
+            using (var cmd = new NpgsqlCommand("drop table if exists test.test", conn))
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+            string createTable = @"
+                CREATE TABLE test.test (
+                    id text default gen_random_text_uuid() primary key,
+                    datetime timestamp with time zone
+                )";
+            using (var cmd = new NpgsqlCommand(createTable, conn))
+            {
+                await cmd.ExecuteNonQueryAsync();
+            }
+            CrateContext.ConnectionString = conn.ConnectionString;
+            var entries = new List<TestEntity>();
+            using (CrateContext context = new()) {
+                for (int i = 0; i < 4; i++)
+                {
+                    var entry = new TestEntity();
+                    context.Test.Add(entry);
+                    entries.Add(entry);
+                }
+                await context.SaveChangesAsync();
+            }
+
+            using (CrateContext context = new()) {
+                foreach (var entry in entries) {
+                    context.Test.Add(entry);
+                }
+                await context.SaveChangesAsync();
             }
         }
 
