@@ -46,7 +46,7 @@ CREATE TABLE parted (
 
 CREATE_DOC_TABLE = '''
 CREATE TABLE t1 (
-    id INTEGER PRIMARY KEY,
+    id STRING PRIMARY KEY,
     col_bool BOOLEAN,
     col_byte BYTE,
     col_short SHORT,
