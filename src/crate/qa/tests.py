@@ -7,13 +7,12 @@ import tempfile
 import functools
 from pprint import pformat
 from threading import Thread
-from collections import OrderedDict
 from typing import Dict, Any, NamedTuple, Iterable, List
 from distutils.version import StrictVersion as V
 from faker.generator import random
 from glob import glob
 from cr8.run_crate import CrateNode, get_crate, _extract_version
-from cr8.insert_fake_data import SELLECT_COLS, create_row_generator
+from cr8.insert_fake_data import SELLECT_COLS, Column, create_row_generator
 from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
@@ -77,12 +76,13 @@ def columns_for_table(conn, schema, table):
     stmt = SELLECT_COLS.format(
         schema_column_name='table_schema' if version >= CRATEDB_0_57 else 'schema_name')
     c.execute(stmt, (schema, table, ))
-    return OrderedDict(c.fetchall())
+    return [Column(*row) for row in c.fetchall()]
 
 
 def insert_data(conn, schema, table, num_rows):
     cols = columns_for_table(conn, schema, table)
-    stmt, args = to_insert(f'"{schema}"."{table}"', cols)
+    columns_dict = {r.name: r.type_name for r in cols}
+    stmt, args = to_insert(f'"{schema}"."{table}"', columns_dict)
     gen_row = create_row_generator(cols)
     c = conn.cursor()
     c.executemany(stmt, [gen_row() for x in range(num_rows)])
