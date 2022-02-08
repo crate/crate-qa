@@ -3,11 +3,8 @@
 // https://www.jenkins.io/doc/book/pipeline/syntax/
 pipeline {
   agent any
-  environment {
-    JDK_11 = 'openjdk@1.11.0'
-  }
   options {
-    timeout(time: 4, unit: 'HOURS') 
+    timeout(time: 4, unit: 'HOURS')
   }
   stages {
     stage('Parallel') {
@@ -116,7 +113,7 @@ pipeline {
           }
         }
         stage('Haskell client tests') {
-          agent { label 'medium' }
+          agent { label 'docker' }
           steps {
             checkout scm
             sh '''
