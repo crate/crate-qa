@@ -34,9 +34,6 @@ pipeline {
               source env/bin/activate
               python -m pip install -U -e .
 
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
-
               (cd tests && python -m unittest discover -vvvf -s bwc)
             '''
           }
@@ -50,9 +47,6 @@ pipeline {
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
-
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
 
               (cd tests && python -m unittest discover -vvvf -s restart)
             '''
@@ -68,9 +62,6 @@ pipeline {
               source env/bin/activate
               python -m pip install -U -e .
 
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
-
               (cd tests && python -m unittest discover -vvvf -s startup)
             '''
           }
@@ -84,9 +75,6 @@ pipeline {
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
-
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
 
               git submodule update --init
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
@@ -102,9 +90,6 @@ pipeline {
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
-
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
 
               (cd tests && python -m unittest discover -vvvf -s client_tests)
             '''
@@ -139,11 +124,10 @@ pipeline {
               /usr/bin/python3.7 -m venv env
               source env/bin/activate
               python -m pip install -U cr8
-              jabba install $JDK_11
               mkdir -p ~/.local/bin
               export PATH=$HOME/.local/bin:$PATH
               curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
-              JAVA_HOME=$(jabba which --home $JDK_11) tests/client_tests/haskell/run.sh
+              ./tests/client_tests/haskell/run.sh
             '''
           }
         }
@@ -152,8 +136,6 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
               (cd tests/client_tests/stock_jdbc && ./gradlew test)
             '''
           }
@@ -264,8 +246,6 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              jabba install $JDK_11
-              export JAVA_HOME=$(jabba which --home $JDK_11)
               (cd tests/kafka-connect-jdbc/ && ./run.sh)
             '''
           }
