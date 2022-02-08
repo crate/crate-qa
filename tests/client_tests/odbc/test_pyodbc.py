@@ -22,7 +22,7 @@ def open_db_connection(connection_string):
 
 class PyODBCTestCase(NodeProvider, unittest.TestCase):
 
-    DRIVER_NAME = os.environ.get('ODBC_DRIVER_NAME', 'PostgreSQL')
+    DRIVER_NAME = os.environ.get('ODBC_DRIVER_NAME', 'PostgreSQL Unicode')
 
     def connection_str(self, node):
         database = 'doc'
