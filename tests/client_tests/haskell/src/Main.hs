@@ -43,7 +43,7 @@ runQueriesWithHDBC host port = do
 runQueriesWithHasqlConn :: Hasql.Connection -> IO ()
 runQueriesWithHasqlConn conn = do
   run (Hasql.sql "drop table if exists t1")
-  run (Hasql.sql "create table t1 (x int, name string)")
+  run (Hasql.sql "create table t1 (x int not null, name string not null)")
   rowCount <- run (Hasql.statement (10, "foo") insert)
   print rowCount
   run (Hasql.sql "refresh table t1")
@@ -56,14 +56,15 @@ runQueriesWithHasqlConn conn = do
       case result of
         Left err -> error $ show err
         Right val -> pure val
-    insert = Hasql.Statement 
+    insert = Hasql.Statement
       "insert into t1 (x, name) values ($1, $2)" insertParams Decoders.rowsAffected True
-    insertParams = 
-      contramap fst (Encoders.param Encoders.int4) <>
-      contramap snd (Encoders.param Encoders.text)
-    intAndTextTuple = Decoders.rowList $ 
-      (,) <$> Decoders.column Decoders.int4 <*> Decoders.column Decoders.text
-    select = Hasql.Statement "select x, name from t1" Encoders.unit intAndTextTuple True
+    insertParams =
+      contramap fst (Encoders.param $ Encoders.nonNullable Encoders.int4) <>
+      contramap snd (Encoders.param $ Encoders.nonNullable Encoders.text)
+    intAndTextTuple = Decoders.rowList $
+      (,) <$> (Decoders.column . Decoders.nonNullable) Decoders.int4
+          <*> (Decoders.column . Decoders.nonNullable) Decoders.text
+    select = Hasql.Statement "select x, name from t1" Encoders.noParams intAndTextTuple True
 
 
 runQueriesWithHasql :: String -> String -> IO ()
