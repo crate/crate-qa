@@ -2,7 +2,15 @@
 // https://www.jenkins.io/doc/book/pipeline/docker/
 // https://www.jenkins.io/doc/book/pipeline/syntax/
 pipeline {
+
   agent any
+
+  // When using the Jenkins pipeline where each stage runs on a different agent,
+  // it is good practice to use `agent none` at the beginning.
+  // https://stackoverflow.com/questions/44531003/how-to-use-post-steps-with-jenkins-pipeline-on-multiple-agents
+  // https://github.com/jenkinsci/pipeline-model-definition-plugin/wiki/Controlling-your-build-environment#3-i-like-to-drive-stick-get-out-of-my-way
+  //agent none
+
   environment {
     JDK_11 = 'openjdk@1.11.0'
   }
@@ -273,9 +281,24 @@ pipeline {
       }
     }
   }
+
+  // Clean up workspace.
   post {
     cleanup {
-      deleteDir()  /* clean up our workspace */
+      deleteDir()
     }
   }
+
+  // Clean up workspace on any node.
+  // https://stackoverflow.com/questions/44531003/how-to-use-post-steps-with-jenkins-pipeline-on-multiple-agents
+  /*
+  post {
+    always {
+      node(null) {
+        deleteDir()
+      }
+    }
+  }
+  */
+
 }
