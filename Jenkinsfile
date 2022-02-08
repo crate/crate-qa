@@ -238,7 +238,7 @@ pipeline {
         }
         stage('kafka-connect jdbc tests') {
           agent {
-            label 'docker'
+            label 'docker && medium'
           }
           steps {
             checkout scm
