@@ -17,7 +17,7 @@ pipeline {
           steps {
             checkout scm
             sh 'rm -rf env'
-            sh '/usr/bin/python3.7 -m venv env'
+            sh '/usr/bin/python3 -m venv env'
             sh 'env/bin/python -m pip install -U mypy flake8'
             sh 'find tests -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
             sh 'find src -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
@@ -30,7 +30,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -44,7 +44,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -58,7 +58,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -72,7 +72,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -87,7 +87,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U -e .
 
@@ -121,7 +121,7 @@ pipeline {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.7 -m venv env
+              /usr/bin/python3 -m venv env
               source env/bin/activate
               python -m pip install -U cr8
               mkdir -p ~/.local/bin
