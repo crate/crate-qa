@@ -1,11 +1,8 @@
 ---
 resolver: lts-18.24
 
-docker:
-  enable: true
-
 packages:
   - .
 
 extra-deps:
-  - HDBC-postgresql-2.5.0.0@sha256:10ceb4f456bbd4768a3f0ab425d9b4d40cb0e17992083b881b37fe5d91b58aba
+  - HDBC-postgresql-2.5.0.1@sha256:37bb911cd996d12c91fa711002877f32f91bcc488de76d85a05865c3af9dc580,3032
