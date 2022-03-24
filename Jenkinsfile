@@ -113,17 +113,22 @@ pipeline {
           }
         }
         stage('Haskell client tests') {
-          agent { label 'docker' }
+          agent {
+            dockerfile {
+              label 'docker'
+              filename 'tests/client_tests/haskell/Dockerfile'
+            }
+          }
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3 -m venv env
-              source env/bin/activate
+              export HOME=$(pwd)
+              export LANG=en_US.UTF-8
+
+              test -d env && rm -rf env
+              python3 -m venv env
+              . env/bin/activate
               python -m pip install -U cr8
-              mkdir -p ~/.local/bin
-              export PATH=$HOME/.local/bin:$PATH
-              curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
               ./tests/client_tests/haskell/run.sh
             '''
           }
