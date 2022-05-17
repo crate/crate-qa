@@ -189,8 +189,7 @@ class NodeProvider:
         s = {
             'cluster.name': gen_id(),
             'gateway.recover_after_nodes': num_nodes,
-            'gateway.expected_nodes': num_nodes,
-            'node.max_local_storage_nodes': num_nodes,
+            'gateway.expected_nodes': num_nodes
         }
         s.update(settings)
         nodes = []
@@ -208,8 +207,7 @@ class NodeProvider:
         s = {
             'cluster.name': gen_id(),
             'gateway.recover_after_nodes': num_nodes,
-            'gateway.expected_nodes': num_nodes,
-            'node.max_local_storage_nodes': num_nodes,
+            'gateway.expected_nodes': num_nodes
         }
         s.update(settings)
         nodes = []
@@ -226,11 +224,11 @@ class NodeProvider:
         return new_node
 
     def setUp(self):
-        self._path_data = self.mkdtemp()
         self._on_stop = []
         self._log_consumers = []
 
         def new_node(version, settings=None, env=None):
+            self._path_data = self.mkdtemp()
             crate_dir = get_crate(version)
             version_tuple = _extract_version(crate_dir)
             v = version_tuple_to_strict_version(version_tuple)
