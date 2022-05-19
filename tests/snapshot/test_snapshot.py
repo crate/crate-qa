@@ -1,5 +1,4 @@
 import random
-import shutil
 import threading
 import unittest
 
@@ -11,11 +10,6 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, ge
 
 
 class SnapshotOperationTest(NodeProvider, unittest.TestCase):
-
-    PATH_DATA = 'data_test_snapshot_ops'
-
-    def tearDown(self):
-        shutil.rmtree(self.PATH_DATA, ignore_errors=True)
 
     def _assert_num_docs(self, conn, expected_count):
         c = conn.cursor()
@@ -45,9 +39,7 @@ class SnapshotOperationTest(NodeProvider, unittest.TestCase):
 
             cluster_settings = {
                 'cluster.name': gen_id(),
-                'path.data': self.PATH_DATA
             }
-            shutil.rmtree(self.PATH_DATA, ignore_errors=True)
             cluster = self._new_cluster('latest-nightly', num_nodes, settings=cluster_settings)
             cluster.start()
 

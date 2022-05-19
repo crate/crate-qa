@@ -192,7 +192,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         version_def = versions[0]
         env = prepare_env(version_def.java_home)
         cluster = self._new_cluster(
-            version_def.version, nodes, self.CLUSTER_SETTINGS, env)
+            version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
+        paths = [node._settings['path.data'] for node in cluster.nodes()]
         cluster.start()
         digest = None
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -212,16 +213,16 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version_def in versions[1:]:
-            self.assert_data_persistence(version_def, nodes, digest)
+            self.assert_data_persistence(version_def, nodes, digest, paths)
 
         # restart with latest version
         version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest)
+        self.assert_data_persistence(version_def, nodes, digest, paths)
 
-    def assert_data_persistence(self, version_def, nodes, digest):
+    def assert_data_persistence(self, version_def, nodes, digest, paths):
         env = prepare_env(version_def.java_home)
         version = version_def.version
-        cluster = self._new_cluster(version, nodes, self.CLUSTER_SETTINGS, env)
+        cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -264,7 +265,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
 
         cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
-                                    self.CLUSTER_SETTINGS)
+                                    settings=self.CLUSTER_SETTINGS)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -282,16 +283,19 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             ''')
         self._process_on_stop()
 
+        paths = [node._settings['path.data'] for node in cluster.nodes()]
+
         for version_def in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_meta_data(version_def, nodes)
+            self.assert_meta_data(version_def, nodes, paths)
 
         # restart with latest version
-        self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes)
+        self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes, paths)
 
-    def assert_meta_data(self, version_def, nodes):
+    def assert_meta_data(self, version_def, nodes, data_paths=None):
         cluster = self._new_cluster(
             version_def.version,
             nodes,
+            data_paths,
             self.CLUSTER_SETTINGS,
             prepare_env(version_def.java_home))
         cluster.start()
@@ -339,17 +343,18 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
 
         cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
-                                    self.CLUSTER_SETTINGS)
+                                    settings=self.CLUSTER_SETTINGS)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute("select 1")
         self._process_on_stop()
 
+        paths = [node._settings['path.data'] for node in cluster.nodes()]
         for version_def in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_dynamic_string_detection(version_def, nodes)
+            self.assert_dynamic_string_detection(version_def, nodes, paths)
 
-    def assert_dynamic_string_detection(self, version_def, nodes):
+    def assert_dynamic_string_detection(self, version_def, nodes, data_paths):
         """ Test that a dynamic string column detection works as expected.
 
         If the cluster was initially created/started with a lower CrateDB
@@ -357,10 +362,11 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         needed, because it is persisted in the cluster state. That's why
         re-creating tables would not help.
         """
-        self._move_nodes_folder_if_needed()
+        self._move_nodes_folder_if_needed(data_paths)
         cluster = self._new_cluster(
             version_def.version,
             nodes,
+            data_paths,
             self.CLUSTER_SETTINGS,
             prepare_env(version_def.java_home)
         )
@@ -377,14 +383,15 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute('DROP TABLE t1')
             self._process_on_stop()
 
-    def _move_nodes_folder_if_needed(self):
+    def _move_nodes_folder_if_needed(self, data_paths):
         """Eliminates the cluster-id folder inside the data directory."""
-        data_path_incl_cluster_id = os.path.join(self._path_data, self.CLUSTER_ID)
-        if os.path.exists(data_path_incl_cluster_id):
-            src_path_nodes = os.path.join(data_path_incl_cluster_id, 'nodes')
-            target_path_nodes = os.path.join(self._path_data, 'nodes')
-            shutil.move(src_path_nodes, target_path_nodes)
-            shutil.rmtree(data_path_incl_cluster_id)
+        for path in data_paths:
+            data_path_incl_cluster_id = os.path.join(path, self.CLUSTER_ID)
+            if os.path.exists(data_path_incl_cluster_id):
+                src_path_nodes = os.path.join(data_path_incl_cluster_id, 'nodes')
+                target_path_nodes = os.path.join(self._path_data, 'nodes')
+                shutil.move(src_path_nodes, target_path_nodes)
+                shutil.rmtree(data_path_incl_cluster_id)
 
 
 class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
@@ -411,7 +418,8 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
 
         cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
                                     nodes,
-                                    self.CLUSTER_SETTINGS)
+                                    settings=self.CLUSTER_SETTINGS)
+        paths = [node._settings['path.data'] for node in cluster.nodes()]
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -429,14 +437,15 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
 
         for version_def in self.SUPPORTED_VERSIONS[1:]:
-            self.start_cluster_and_alter_tables(version_def, nodes)
+            self.start_cluster_and_alter_tables(version_def, nodes, paths)
 
-    def start_cluster_and_alter_tables(self, version_def, nodes):
+    def start_cluster_and_alter_tables(self, version_def, nodes, paths):
         cluster = self._new_cluster(
             version_def.version,
             nodes,
-            self.CLUSTER_SETTINGS,
-            prepare_env(version_def.java_home)
+            paths,
+            settings=self.CLUSTER_SETTINGS,
+            env=prepare_env(version_def.java_home)
         )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -491,14 +500,15 @@ protocol = 'http')
             num_docs = 30
             prev_version = None
             num_snapshot = 1
-            path_data = 'data_test_snapshot_compatibility'
+
             cluster_settings = {
                 'cluster.name': gen_id(),
-                'path.data': path_data
             }
-            shutil.rmtree(path_data, ignore_errors=True)
+
+            paths = None
             for version in self.VERSION:
-                cluster = self._new_cluster(version, num_nodes, settings=cluster_settings)
+                cluster = self._new_cluster(version, num_nodes, paths, settings=cluster_settings)
+                paths = [node._settings['path.data'] for node in cluster.nodes()]
                 cluster.start()
                 with connect(cluster.node().http_url, error_trace=True) as conn:
                     c = conn.cursor()
@@ -518,4 +528,3 @@ protocol = 'http')
                 self._process_on_stop()
                 prev_version = version
                 num_snapshot += 1
-            shutil.rmtree(path_data, ignore_errors=True)
