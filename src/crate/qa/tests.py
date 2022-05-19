@@ -150,6 +150,9 @@ class CrateCluster:
     def node(self):
         return random.choice(self._nodes)
 
+    def nodes(self):
+        return self._nodes
+
     def __next__(self):
         return next(self._nodes)
 
@@ -181,7 +184,8 @@ class NodeProvider:
             for x in range(num)
         ])
 
-    def _new_cluster(self, version, num_nodes, settings=None, env=None):
+    def _new_cluster(self, version, num_nodes, data_paths=None, settings=None, env=None):
+        """ data_paths has 'num_nodes' elements and data_paths[i] stores path of the i-th node. 'None' if called first time."""
         self.assertTrue(hasattr(self, '_new_node'))
         settings = settings or {}
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
@@ -195,6 +199,11 @@ class NodeProvider:
         nodes = []
         for id in range(num_nodes):
             s['node.name'] = s['cluster.name'] + '-' + str(id)
+            """ We want to preserve data_paths when we start cluster second time during a test.
+            Path is taken from the first start.
+            """
+            if data_paths is not None:
+                s['path.data'] = data_paths[id]
             nodes.append(self._new_node(version, s, env)[0])
         return CrateCluster(nodes)
 
@@ -228,16 +237,22 @@ class NodeProvider:
         self._log_consumers = []
 
         def new_node(version, settings=None, env=None):
-            self._path_data = self.mkdtemp()
             crate_dir = get_crate(version)
             version_tuple = _extract_version(crate_dir)
             v = version_tuple_to_strict_version(version_tuple)
             s = {
-                'path.data': self._path_data,
                 'cluster.name': 'crate-qa',
             }
             s.update(settings or {})
             s.update(test_settings(v))
+
+            """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
+            However, we don't want to re-generate data path if we create a node based on existing settings, for example
+            upgrade_node calls this method with old_node._settings
+            """
+            if "path.data" not in s:
+                s['path.data'] = self.mkdtemp()
+
             s = remove_unsupported_settings(v, s)
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
