@@ -99,4 +99,4 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
             cursor.execute("REFRESH TABLE t1")
             cursor.execute("SELECT t FROM t1 WHERE id = ?", 4)
             row = cursor.fetchone()
-            self.assertEqual('1999-01-08 02:05:06', row.t.strftime("%Y-%m-%d %H:%M:%S"))
+            self.assertEqual('1999-01-08 04:05:06', row.t.strftime("%Y-%m-%d %H:%M:%S"))
