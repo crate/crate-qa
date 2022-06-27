@@ -52,14 +52,14 @@ async def basic_queries(test, conn):
 
     result = await conn.execute('''
         INSERT INTO t1 (x) (
-            SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?
+            SELECT unnest FROM unnest([1, 2]) WHERE unnest = ?
         )
     ''', 1)
     test.assertEqual(result, 'INSERT 0 1')
 
     result = await conn.execute('''
         INSERT INTO t1 (x) (
-            SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)
+            SELECT unnest FROM unnest([1, 2]) WHERE unnest = ?)
         ON CONFLICT (x) DO UPDATE SET y = ?
     ''', 1, 2)
     test.assertEqual(result, 'INSERT 0 1')

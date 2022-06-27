@@ -62,12 +62,12 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
 
             cursor.execute("REFRESH TABLE t1")
 
-            cursor.execute("INSERT INTO t1 (id) (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)", 1)
+            cursor.execute("INSERT INTO t1 (id) (SELECT unnest FROM unnest([1, 2]) WHERE unnest = ?)", 1)
 
             cursor.execute("REFRESH TABLE t1")
 
             cursor.execute("INSERT INTO t1 (id)"
-                           " (SELECT col1 FROM unnest([1, 2]) WHERE col1 = ?)"
+                           " (SELECT unnest FROM unnest([1, 2]) WHERE unnest = ?)"
                            " ON CONFLICT (id) DO UPDATE SET x = ?", 1, 3)
 
             cursor.execute("REFRESH TABLE t1")
