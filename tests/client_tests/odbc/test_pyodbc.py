@@ -46,8 +46,15 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
             self.assertIsNotNone(row)
 
         with open_db_connection(self.connection_str(node)) as cursor:
-            cursor.execute("CREATE TABLE t1 ("
-                           "id INTEGER PRIMARY KEY, x INTEGER, o OBJECT, a ARRAY(INT), t TIMESTAMP)")
+            cursor.execute("""
+                CREATE TABLE t1 (
+                    id INTEGER PRIMARY KEY,
+                    x INTEGER,
+                    o OBJECT,
+                    a ARRAY(INT),
+                    t TIMESTAMP,
+                    bitcol bit
+                )""")
             self.assertEqual(cursor.rowcount, 1)
 
             cursor.execute("INSERT INTO t1(id) VALUES(?)", 1)
@@ -100,3 +107,10 @@ class PyODBCTestCase(NodeProvider, unittest.TestCase):
             cursor.execute("SELECT t FROM t1 WHERE id = ?", 4)
             row = cursor.fetchone()
             self.assertEqual('1999-01-08 04:05:06', row.t.strftime("%Y-%m-%d %H:%M:%S"))
+
+        with open_db_connection(self.connection_str(node)) as cursor:
+            cursor.execute("INSERT INTO t1 (id, bitcol) VALUES(?, ?)", 5, 1)
+            cursor.execute("REFRESH TABLE t1")
+            cursor.execute("SELECT bitcol FROM t1 where id = 5")
+            row = cursor.fetchone()
+            self.assertEqual('1', row.bitcol)
