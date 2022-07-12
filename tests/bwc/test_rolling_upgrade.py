@@ -14,7 +14,8 @@ ROLLING_UPGRADES = (
     UpgradePath('4.5.x', '4.6.x'),
     UpgradePath('4.6.x', '4.7.x'),
     UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', 'latest-nightly'),
+    UpgradePath('4.8.x', '5.0.x'),
+    UpgradePath('5.0.x', 'latest-nightly')
 )
 
 
