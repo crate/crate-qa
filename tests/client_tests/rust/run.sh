@@ -2,4 +2,4 @@
 set -Eeuo pipefail
 
 cr8 run-crate latest-nightly \
-  -- @cargo run
+  -- @cargo run {node.addresses.psql.port}

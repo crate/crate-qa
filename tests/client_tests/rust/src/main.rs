@@ -1,8 +1,9 @@
 use postgres::{Client, NoTls};
-
+use std::env;
 
 fn main() {
-    let mut client = Client::connect("host=localhost user=crate", NoTls).unwrap();
+    let args: Vec<String> = env::args().collect();
+    let mut client = Client::connect(format!("host=localhost port={} user=crate", &args[1]).as_str(), NoTls).unwrap();
     client
         .simple_query("CREATE TABLE tbl (id int primary key, x int not null, name text not null);")
         .unwrap();
