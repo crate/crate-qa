@@ -17,7 +17,7 @@ cd crate-qa
 Create virtualenv and install requirements:
 
 ```
-python3.8 -m venv env
+python3 -m venv env
 source env/bin/activate
 # optional: pip install --upgrade pip wheel
 pip install --upgrade -e .
@@ -62,21 +62,21 @@ Yum:
 
 ### Usage
 
-Tests can be run by changing into the test directory and run `python -m
-unittest`. See `python -m unittest --help` for further options.
+Tests can be run by changing into the test directory and run `python3 -m
+unittest`. See `python3 -m unittest --help` for further options.
 
 Run all test cases (tests in Python files that are prefixed with `test_`)
 inside `tests/` and subfolders.
 
 ```bash
 cd tests/
-$ python3.6 -m unittest -v
+$ python3 -m unittest -v
 ```
 
 Run a specific test method (e.g. `restart.test_query_partitioned_table`)
 
 ```bash
-$ python3.6 -m unittest -v restart.test_partitions.PartitionTestCase.test_query_partitioned_table
+$ python3 -m unittest -v restart.test_partitions.PartitionTestCase.test_query_partitioned_table
 ```
 
 ## Help
