@@ -3,6 +3,7 @@
 *.egg-info/
 .eggs/
 env/
+venv/
 .mypy_cache/
 .stack-work/
 .idea
