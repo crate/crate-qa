@@ -23,12 +23,13 @@ faulthandler.enable()
 
 # might want to change this to a blacklist at some point
 FILE_WHITELIST = [re.compile(o) for o in [
-    r'select[1-5].test',
-    r'random/select/slt_good_\d+.test',
-    r'random/groupby/slt_good_\d+.test',
-    r'evidence/slt_lang_createview\.test',
-    r'evidence/slt_lang_dropview\.test',
-    r'custom/tableau.test'
+    # r'select[1-5].test',
+    # r'random/select/slt_good_\d+.test',
+    r'random/expr/slt_good_3[0-9].test',
+    # r'random/groupby/slt_good_\d+.test',
+    # r'evidence/slt_lang_createview\.test',
+    # r'evidence/slt_lang_dropview\.test',
+    # r'custom/tableau.test'
 ]]
 
 
@@ -44,6 +45,7 @@ def merge_logfiles(logfiles):
 
 
 class SqlLogicTest(NodeProvider, unittest.TestCase):
+    os.environ['CRATE_HEAP_SIZE'] = '4g'
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
     }

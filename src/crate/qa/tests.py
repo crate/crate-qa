@@ -166,7 +166,6 @@ class CrateCluster:
 class NodeProvider:
 
     CRATE_VERSION = os.environ.get('CRATE_VERSION', 'latest-nightly')
-    CRATE_HEAP_SIZE = os.environ.get('CRATE_HEAP_SIZE', '512m')
     DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
     def __init__(self, *args, **kwargs):
@@ -255,7 +254,7 @@ class NodeProvider:
 
             s = remove_unsupported_settings(v, s)
             e = {
-                'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+                'CRATE_HEAP_SIZE': os.environ.get('CRATE_HEAP_SIZE', '512m'),
                 'CRATE_DISABLE_GC_LOGGING': '1',
                 'CRATE_HOME': crate_dir,
             }
