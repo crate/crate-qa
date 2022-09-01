@@ -29,6 +29,8 @@ pipeline {
               rm -rf env
               /usr/bin/python3 -m venv env
               source env/bin/activate
+	      pip install --upgrade pip wheel
+	      python setup.py bdist_wheel
               python -m pip install -U -e .
 
               (cd tests && python -m unittest discover -vvvf -s bwc)
