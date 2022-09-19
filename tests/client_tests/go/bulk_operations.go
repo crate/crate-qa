@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 )
 
 func main() {

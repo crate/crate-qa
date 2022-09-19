@@ -4,9 +4,10 @@ import (
 	"flag"
 	"context"
 	"fmt"
-	"github.com/jackc/pgx"
 	"log"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func main() {
