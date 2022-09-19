@@ -108,7 +108,10 @@ pipeline {
               python3 -m venv env
               . env/bin/activate
               python -m pip install -U cr8 crash
-              (cd tests/client_tests/go && ./run.sh)
+              cd ${HOME}/tests/client_tests/go
+              test -f go.mod && rm go.mod
+              test -f go.sum && rm go.sum
+              ./run.sh
             '''
           }
         }
