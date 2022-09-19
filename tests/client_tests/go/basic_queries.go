@@ -33,6 +33,9 @@ func main() {
 	}
 	fmt.Println(commandTag)
 	ts := time.Now()
+	// Convert to UTC
+	loc, _ := time.LoadLocation("UTC")
+	ts = ts.In(loc)
 	commandTag, err = conn.Exec(ctx, "insert into t1 (x, ts) values (?, ?)", 1, ts)
 	if err != nil {
 		log.Fatal(err)
