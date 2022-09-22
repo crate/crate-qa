@@ -15,9 +15,14 @@ fn main() {
         )
         .unwrap();
 
-    let stmt = client
-        .prepare("INSERT INTO tbl (id, x, name) values ($1, $2, $3)")
-        .unwrap();
+    let stmt = match client
+        .prepare("INSERT INTO tbl (id, x, name) values ($1, $2, $3)") {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                println!("Preparing insert failed: {:?}", e);
+                return;
+            }
+        };
 
     let id = 2;
     let x = 20;
