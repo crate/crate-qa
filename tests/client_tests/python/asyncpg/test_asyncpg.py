@@ -68,7 +68,7 @@ async def basic_queries(test, conn):
 async def record_type_can_be_read_using_binary_streaming(test, conn):
     result = await conn.fetch('SELECT pg_catalog.pg_get_keywords()')
     keyword = sorted([row[0] for row in result], key=lambda x: x[0])[0]
-    test.assertEqual(keyword, ('add', 'R', 'reserved'))
+    test.assertEqual(keyword, ('absolute', 'U', 'unreserved'))
 
 
 async def bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn):
