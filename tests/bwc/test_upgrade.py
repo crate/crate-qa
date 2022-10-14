@@ -2,7 +2,6 @@ import os
 import shutil
 import threading
 import unittest
-import time
 from uuid import uuid4
 from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
@@ -23,18 +22,18 @@ from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
     (
-        VersionDef('4.0.x', False, []),
-        VersionDef('4.1.x', False, []),
-        VersionDef('4.2.x', False, []),
-        VersionDef('4.3.x', False, []),
-        VersionDef('4.4.x', False, []),
-        VersionDef('4.5.x', False, []),
-        VersionDef('4.6.x', False, []),
-        VersionDef('4.7.x', False, []),
-        VersionDef('4.8.x', False, []),
-        VersionDef('5.0.x', False, []),
-        VersionDef('5.1.x', False, []),
-        VersionDef('latest-nightly', False, [])
+        VersionDef('4.0.x', []),
+        VersionDef('4.1.x', []),
+        VersionDef('4.2.x', []),
+        VersionDef('4.3.x', []),
+        VersionDef('4.4.x', []),
+        VersionDef('4.5.x', []),
+        VersionDef('4.6.x', []),
+        VersionDef('4.7.x', []),
+        VersionDef('4.8.x', []),
+        VersionDef('5.0.x', []),
+        VersionDef('5.1.x', []),
+        VersionDef('latest-nightly', [])
     ),
 )
 
@@ -161,29 +160,6 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             finally:
                 self.tearDown()
 
-    def _upgrade(self, cursor, upgrade_segments, num_retries=3):
-        """
-        Performs the upgrade of the indices and retries in case of
-        ProgrammingErrors.
-
-        The retry was added because the wait_for_active shards check
-        collects the shard information directly from the nodes. The
-        internal ES code, however, retrieves the shard information
-        from the ClusterState. A retry is necessary in case the shards
-        are ready but the cluster state hasn't been updated yet.
-        """
-        try:
-            if upgrade_segments:
-                cursor.execute('OPTIMIZE TABLE doc.t1 WITH (upgrade_segments = true)')
-                cursor.execute('OPTIMIZE TABLE blob.b1 WITH (upgrade_segments = true)')
-        except ProgrammingError as e:
-            print(f'OPTIMIZE failed: {e.message} (num_retries={num_retries})')
-            if num_retries > 0 and "PrimaryMissingActionException" in e.message:
-                time.sleep(1 / (num_retries + 1))
-                self._upgrade(cursor, upgrade_segments, num_retries - 1)
-            else:
-                raise e
-
     def _test_upgrade_path(self, versions: Tuple[VersionDef], nodes):
         """ Test upgrade path across specified versions.
 
@@ -229,7 +205,6 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
-            self._upgrade(cursor, version_def.upgrade_segments)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
             run_selects(cursor, version_def.version)
             container = conn.get_blob_container('b1')
@@ -257,9 +232,9 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        VersionDef('2.3.x', False, []),
-        VersionDef('3.3.x', False, []),
-        VersionDef('latest-nightly', False, [])
+        VersionDef('2.3.x', []),
+        VersionDef('3.3.x', []),
+        VersionDef('latest-nightly', [])
     )
 
     def test_metadata_compatibility(self):
@@ -336,8 +311,8 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        VersionDef('3.0.x', False, []),
-        VersionDef('latest-nightly', False, [])
+        VersionDef('3.0.x', []),
+        VersionDef('latest-nightly', [])
     )
 
     def test_metadata_compatibility(self):
@@ -403,8 +378,8 @@ class TableSettingsCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        VersionDef('2.3.x', False, []),
-        VersionDef('3.2.x', False, [])
+        VersionDef('2.3.x', []),
+        VersionDef('3.2.x', [])
     )
 
     def test_altering_tables_with_old_settings(self):

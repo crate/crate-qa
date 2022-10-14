@@ -126,7 +126,6 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
 
 class VersionDef(NamedTuple):
     version: str
-    upgrade_segments: bool
     java_home: Iterable[str]
 
 
