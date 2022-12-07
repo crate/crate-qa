@@ -108,7 +108,7 @@ class MetadataTestCase(NodeProvider, unittest.TestCase):
             """)
             cursor.execute("""
             CREATE VIEW s.v2 AS
-                SELECT * FROM s.t1 WHERE day > CURRENT_TIMESTAMP - 1000 * 60 * 60 * 24;
+                SELECT * FROM s.t1 WHERE day > CURRENT_TIMESTAMP - INTERVAL '24' HOUR;
             """)
         node.stop()
 
