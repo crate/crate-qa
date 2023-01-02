@@ -164,14 +164,14 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getDatabaseMajorVersion() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            assertThat(conn.getMetaData().getDatabaseMajorVersion(), is(10));
+            assertThat(conn.getMetaData().getDatabaseMajorVersion(), is(11));
         }
     }
 
     @Test
     public void test_getDatabaseMinorVersion() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            assertThat(conn.getMetaData().getDatabaseMinorVersion(), is(5));
+            assertThat(conn.getMetaData().getDatabaseMinorVersion(), is(0));
         }
     }
 
@@ -185,7 +185,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getDatabaseProductVersion() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            assertThat(conn.getMetaData().getDatabaseProductVersion(), is("10.5"));
+            assertThat(conn.getMetaData().getDatabaseProductVersion(), is("11.0"));
         }
     }
 
