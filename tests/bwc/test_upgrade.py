@@ -33,6 +33,7 @@ UPGRADE_PATHS = (
         VersionDef('4.8.x', []),
         VersionDef('5.0.x', []),
         VersionDef('5.1.x', []),
+        VersionDef('5.2.x', []),
         VersionDef('latest-nightly', [])
     ),
 )
