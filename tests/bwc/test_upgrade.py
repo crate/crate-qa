@@ -173,30 +173,43 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster = self._new_cluster(
             version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
         paths = [node._settings['path.data'] for node in cluster.nodes()]
-        cluster.start()
-        digest = None
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute(CREATE_ANALYZER)
-            c.execute(CREATE_DOC_TABLE)
-            c.execute(CREATE_PARTED_TABLE)
-            c.execute('''
-                INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
-            ''')
-            insert_data(conn, 'doc', 't1', 10)
-            c.execute(CREATE_BLOB_TABLE)
-            run_selects(c, versions[0].version)
-            container = conn.get_blob_container('b1')
-            digest = container.put(BytesIO(b'sample data'))
-            container.get(digest)
-        self._process_on_stop()
+        try:
+            cluster.start()
+            digest = None
+            with connect(cluster.node().http_url, error_trace=True) as conn:
+                c = conn.cursor()
+                c.execute(CREATE_ANALYZER)
+                c.execute(CREATE_DOC_TABLE)
+                c.execute(CREATE_PARTED_TABLE)
+                c.execute('''
+                    INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
+                ''')
+                insert_data(conn, 'doc', 't1', 10)
+                c.execute(CREATE_BLOB_TABLE)
+                run_selects(c, versions[0].version)
+                container = conn.get_blob_container('b1')
+                digest = container.put(BytesIO(b'sample data'))
+                container.get(digest)
+            self._process_on_stop()
 
-        for version_def in versions[1:]:
+            for version_def in versions[1:]:
+                self.assert_data_persistence(version_def, nodes, digest, paths)
+
+            # restart with latest version
+            version_def = versions[-1]
             self.assert_data_persistence(version_def, nodes, digest, paths)
+        except Exception as e:
+            cluster_name = cluster.nodes()[0].cluster_name
+            logs_path = cluster.nodes()[0].logs_path
 
-        # restart with latest version
-        version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest, paths)
+            msg = "\nLogs\n"
+            msg += "--------------\n"
+            logfile = os.path.join(logs_path, cluster_name + ".log")
+            with open(logfile, "r") as f:
+                logs = f.read()
+                msg += logs
+            msg += "\n"
+            raise Exception(msg).with_traceback(e.__traceback__)
 
     def assert_data_persistence(self, version_def, nodes, digest, paths):
         env = prepare_env(version_def.java_home)
