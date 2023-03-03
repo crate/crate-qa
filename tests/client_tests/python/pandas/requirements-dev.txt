@@ -1,0 +1,7 @@
+black<24
+isort<6
+poethepoet<0.19
+proselint==0.13
+pyproject-fmt<0.10
+ruff==0.0.253
+validate-pyproject<0.13

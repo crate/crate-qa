@@ -1,0 +1,83 @@
+[tool.black]
+line-length = 120
+extend-exclude = "/(\\.cache)"
+
+[tool.isort]
+profile = "black"
+skip_glob = "**/site-packages/**"
+skip_gitignore = false
+
+[tool.pytest.ini_options]
+minversion = "2.0"
+addopts = """
+  -rfEX -p pytester --strict-markers --verbosity=3
+  """
+log_level = "DEBUG"
+log_cli_level = "DEBUG"
+xfail_strict = true
+
+#  --capture=tee-sys
+
+[tool.ruff]
+extend-ignore = [
+  "PD901",  # `df` is a bad variable name. Be kinder to your future self.
+  "S101",   # Use of `assert` detected
+]
+line-length = 120
+
+select = [
+  # Bandit
+  "S",
+  # Bugbear
+  "B",
+  # Builtins
+  "A",
+  # comprehensions
+  "C4",
+  # eradicate
+  "ERA",
+  # flake8-2020
+  "YTT",
+  # pandas-vet
+  "PD",
+  # print
+  "T20",
+  # Pycodestyle
+  "E",
+  "W",
+  # Pyflakes
+  "F",
+  # return
+  "RET",
+]
+
+
+# ===================
+# Tasks configuration
+# ===================
+
+[tool.poe.tasks]
+
+check = [
+  "lint",
+  "test",
+]
+
+format = [
+  { cmd = "black ." },
+  { cmd = "isort ." },
+  # Configure Ruff not to auto-fix (remove!) unused variables (F841) and `print` statements (T201).
+  { cmd = "ruff --fix --ignore=ERA --ignore=F401 --ignore=F841 --ignore=T20 ." },
+  { cmd = "pyproject-fmt pyproject.toml" },
+]
+
+lint = [
+  { cmd = "ruff check ." },
+  { cmd = "black --check ." },
+  { cmd = "isort --check ." },
+  { cmd = "validate-pyproject pyproject.toml" },
+  { cmd = "proselint *.rst doc/**.rst" },
+  # { cmd = "mypy" },
+]
+
+test = { cmd = "pytest" }
