@@ -15,7 +15,7 @@ from crate.qa.tests import (
     wait_for_active_shards,
     insert_data,
     gen_id,
-    prepare_env,
+    prepare_env, timeout,
 )
 
 from crate.qa.minio_svr import MinioServer, _is_up
@@ -174,31 +174,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
         paths = [node._settings['path.data'] for node in cluster.nodes()]
         try:
-            cluster.start()
-            digest = None
-            with connect(cluster.node().http_url, error_trace=True) as conn:
-                c = conn.cursor()
-                c.execute(CREATE_ANALYZER)
-                c.execute(CREATE_DOC_TABLE)
-                c.execute(CREATE_PARTED_TABLE)
-                c.execute('''
-                    INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
-                ''')
-                insert_data(conn, 'doc', 't1', 10)
-                c.execute(CREATE_BLOB_TABLE)
-                run_selects(c, versions[0].version)
-                container = conn.get_blob_container('b1')
-                digest = container.put(BytesIO(b'sample data'))
-                container.get(digest)
-            self._process_on_stop()
-
-            for version_def in versions[1:]:
-                self.assert_data_persistence(version_def, nodes, digest, paths)
-
-            # restart with latest version
-            version_def = versions[-1]
-            self.assert_data_persistence(version_def, nodes, digest, paths)
+            self._do_upgrade(cluster, nodes, paths, versions)
         except Exception as e:
+            msg = ""
             cluster_name = cluster.nodes()[0].cluster_name
             logs_path = cluster.nodes()[0].logs_path
 
@@ -210,6 +188,30 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 msg += logs
             msg += "\n"
             raise Exception(msg).with_traceback(e.__traceback__)
+
+    @timeout(240)
+    def _do_upgrade(self, cluster, nodes, paths, versions):
+        cluster.start()
+        with connect(cluster.node().http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            c.execute(CREATE_ANALYZER)
+            c.execute(CREATE_DOC_TABLE)
+            c.execute(CREATE_PARTED_TABLE)
+            c.execute('''
+                    INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
+                ''')
+            insert_data(conn, 'doc', 't1', 10)
+            c.execute(CREATE_BLOB_TABLE)
+            run_selects(c, versions[0].version)
+            container = conn.get_blob_container('b1')
+            digest = container.put(BytesIO(b'sample data'))
+            container.get(digest)
+        self._process_on_stop()
+        for version_def in versions[1:]:
+            self.assert_data_persistence(version_def, nodes, digest, paths)
+        # restart with latest version
+        version_def = versions[-1]
+        self.assert_data_persistence(version_def, nodes, digest, paths)
 
     def assert_data_persistence(self, version_def, nodes, digest, paths):
         env = prepare_env(version_def.java_home)
