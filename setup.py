@@ -35,7 +35,8 @@ setup(
         'Cython',
         'asyncpg>=0.21',
         'pyodbc',
-        'psycopg2-binary>=2.7.5'
+        'psycopg2-binary>=2.7.5',
+        'psycopg[binary,pool]',
     ],
     python_requires='>=3.6',
     classifiers=[
