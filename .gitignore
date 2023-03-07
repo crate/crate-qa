@@ -4,6 +4,7 @@
 .eggs/
 env/
 venv/
+.venv*/
 .mypy_cache/
 .stack-work/
 .idea
