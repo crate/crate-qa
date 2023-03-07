@@ -73,6 +73,7 @@ async def record_type_can_be_read_using_binary_streaming(test, conn):
 
 async def bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn):
     xs = asyncpg.BitString('0101')
+    await conn.execute('drop table if exists tbl_bit')
     await conn.execute('create table tbl_bit (xs bit(4))')
     await conn.execute('insert into tbl_bit (xs) values (?)', xs)
     await conn.execute('refresh table tbl_bit')
