@@ -21,7 +21,6 @@ option which goes along like this::
 
 """
 import os
-import asyncio
 import asyncpg
 import unittest
 from crate.qa.tests import NodeProvider
@@ -92,6 +91,7 @@ async def fetch_summits(test, uri):
     test.assertEqual(second['mountain'], 'Monte Rosa')
     test.assertEqual(third['mountain'], 'Dom')
     test.assertEqual(fourth['mountain'], 'Liskamm')
+    await conn.close()
 
 
 async def exec_queries_pooled(test, uri):
@@ -100,9 +100,10 @@ async def exec_queries_pooled(test, uri):
         await basic_queries(test, conn)
         await record_type_can_be_read_using_binary_streaming(test, conn)
         await bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn)
+    await pool.close()
 
 
-class AsyncpgTestCase(NodeProvider, unittest.TestCase):
+class AsyncpgTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
 
     def ensure_cratedb(self):
         if "CRATEDB_URI" in os.environ:
@@ -115,13 +116,12 @@ class AsyncpgTestCase(NodeProvider, unittest.TestCase):
             crate_psql_url = f'postgres://crate@{crate_address}/doc'
         return crate_psql_url
 
-    def test_basic_statements(self):
-        crate_psql_url = self.ensure_cratedb()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(exec_queries_pooled(self, crate_psql_url))
+    def setUp(self):
+        super().setUp()
+        self.crate_psql_url = self.ensure_cratedb()
 
-    def test_result_streaming_using_fetch_size(self):
-        crate_psql_url = self.ensure_cratedb()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(
-            fetch_summits(self, crate_psql_url))
+    async def test_basic_statements(self):
+        await exec_queries_pooled(self, self.crate_psql_url)
+
+    async def test_result_streaming_using_fetch_size(self):
+        await fetch_summits(self, self.crate_psql_url)

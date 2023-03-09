@@ -26,7 +26,6 @@ References
 [2] https://github.com/psycopg/psycopg
 """
 import os
-import asyncio
 
 import psycopg
 import psycopg.rows
@@ -152,7 +151,7 @@ async def exec_queries_pooled(test, uri):
     await pool.close()
 
 
-class Psycopg3AsyncTestCase(NodeProvider, unittest.TestCase):
+class Psycopg3AsyncTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
 
     def ensure_cratedb(self):
         if "CRATEDB_URI" in os.environ:
@@ -165,17 +164,18 @@ class Psycopg3AsyncTestCase(NodeProvider, unittest.TestCase):
             crate_psql_url = f'postgres://crate@{crate_address}/doc'
         return crate_psql_url
 
-    def test_basic_statements(self):
-        crate_psql_url = self.ensure_cratedb()
-        asyncio.run(exec_queries_pooled(self, crate_psql_url))
+    def setUp(self):
+        super().setUp()
+        self.crate_psql_url = self.ensure_cratedb()
 
-    def test_result_execute_using_fetch_size(self):
-        crate_psql_url = self.ensure_cratedb()
-        asyncio.run(fetch_summits_execute(self, crate_psql_url))
+    async def test_basic_statements(self):
+        await exec_queries_pooled(self, self.crate_psql_url)
 
-    def test_result_streaming(self):
-        crate_psql_url = self.ensure_cratedb()
-        asyncio.run(fetch_summits_stream(self, crate_psql_url))
+    async def test_result_execute_using_fetch_size(self):
+        await fetch_summits_execute(self, self.crate_psql_url)
+
+    async def test_result_streaming(self):
+        await fetch_summits_stream(self, self.crate_psql_url)
 
     def assertResultCommandEqual(self, result: psycopg.Cursor, command: str, msg=None):
 
