@@ -94,15 +94,37 @@ async def bitstring_can_be_inserted_and_selected_using_binary_encoding(test, con
     """
 
 
-async def fetch_summits_execute(test, uri):
+async def fetch_summits_client_cursor(test, uri):
     """
-    Use the `cursor.execute` method to acquire results.
+    Use the `cursor.execute` method to acquire results, using a client-side cursor.
 
     https://www.psycopg.org/psycopg3/docs/advanced/async.html
+    https://www.psycopg.org/psycopg3/docs/advanced/cursors.html#client-side-cursors
     """
     conn = await psycopg.AsyncConnection.connect(uri)
     async with conn.transaction():
         async with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+            cur = await cursor.execute(
+                'select mountain from sys.summits order by height desc')
+            first, second = await cur.fetchmany(size=2)
+            third, fourth = await cur.fetchmany(size=2)
+    await conn.close()
+    test.assertEqual(first['mountain'], 'Mont Blanc')
+    test.assertEqual(second['mountain'], 'Monte Rosa')
+    test.assertEqual(third['mountain'], 'Dom')
+    test.assertEqual(fourth['mountain'], 'Liskamm')
+
+
+async def fetch_summits_server_cursor(test, uri):
+    """
+    Use the `cursor.execute` method to acquire results, using a server-side cursor.
+
+    https://www.psycopg.org/psycopg3/docs/advanced/async.html
+    https://www.psycopg.org/psycopg3/docs/advanced/cursors.html#server-side-cursors
+    """
+    conn = await psycopg.AsyncConnection.connect(uri)
+    async with conn.transaction():
+        async with conn.cursor(name="foo", row_factory=psycopg.rows.dict_row) as cursor:
             cur = await cursor.execute(
                 'select mountain from sys.summits order by height desc')
             first, second = await cur.fetchmany(size=2)
@@ -171,8 +193,11 @@ class Psycopg3AsyncTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
     async def test_basic_statements(self):
         await exec_queries_pooled(self, self.crate_psql_url)
 
-    async def test_result_execute_using_fetch_size(self):
-        await fetch_summits_execute(self, self.crate_psql_url)
+    async def test_result_execute_client_cursor(self):
+        await fetch_summits_client_cursor(self, self.crate_psql_url)
+
+    async def test_result_execute_server_cursor(self):
+        await fetch_summits_server_cursor(self, self.crate_psql_url)
 
     async def test_result_streaming(self):
         await fetch_summits_stream(self, self.crate_psql_url)
