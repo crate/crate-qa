@@ -15,7 +15,7 @@ from crate.qa.tests import (
     wait_for_active_shards,
     insert_data,
     gen_id,
-    prepare_env, timeout,
+    prepare_env, timeout, assert_busy,
 )
 
 from crate.qa.minio_svr import MinioServer, _is_up
@@ -205,7 +205,10 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             run_selects(c, versions[0].version)
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
-            container.get(digest)
+
+            assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
+            self.assertIsNotNone(container.get(digest))
+
         self._process_on_stop()
         for version_def in versions[1:]:
             self.assert_data_persistence(version_def, nodes, digest, paths)
@@ -237,6 +240,13 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     args
                 )
         self._process_on_stop()
+
+    def assert_green(self, conn: connect, schema: str, table_name: str):
+        c = conn.cursor()
+        c.execute('select health from sys.health where table_name=? and table_schema=?', (table_name, schema))
+        response = c.fetchone()
+        self.assertNotIsInstance(response, type(None))
+        self.assertEqual(response[0], 'GREEN')
 
 
 class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
