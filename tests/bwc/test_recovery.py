@@ -253,8 +253,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute('''
-                        create table doc.test(x int) clustered into 1 shards with( number_of_replicas = 1,
-                         "unassigned.node_left.delayed_timeout" = '100ms', "allocation.max_retries" = '0')
+                        create table doc.test(x int) clustered into 1 shards with(number_of_replicas = 1,
+                         "unassigned.node_left.delayed_timeout" = '20s', "allocation.max_retries" = '10')
                     ''')
 
             num_docs = random.randint(0, 10)
@@ -291,8 +291,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute('''
-                        create table doc.test(x int) clustered into 1 shards with( number_of_replicas = 1,
-                        "unassigned.node_left.delayed_timeout" = '100ms', "allocation.max_retries" = '0')
+                        create table doc.test(x int) clustered into 1 shards with(number_of_replicas = 1,
+                        "unassigned.node_left.delayed_timeout" = '20s', "allocation.max_retries" = '10')
                       ''')
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
@@ -324,7 +324,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute('''
-                        create table doc.old_cluster(x int) clustered into 1 shards with( number_of_replicas = 0)
+                        create table doc.old_cluster(x int) clustered into 1 shards with(number_of_replicas = 0)
                       ''')
 
             self._assert_is_green(conn, 'doc', 'old_cluster')
@@ -336,7 +336,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_is_closed(conn, 'doc', 'old_cluster')
 
             c.execute('''
-                      create table doc.mixed_cluster(x int) clustered into 1 shards with( number_of_replicas = 0)
+                      create table doc.mixed_cluster(x int) clustered into 1 shards with(number_of_replicas = 0)
                       ''')
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'mixed_cluster'))
@@ -351,7 +351,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self._assert_is_closed(conn, 'doc', 'mixed_cluster')
 
             c.execute('''
-                      create table doc.upgraded_cluster(x int) clustered into 1 shards with( number_of_replicas = 0)
+                      create table doc.upgraded_cluster(x int) clustered into 1 shards with(number_of_replicas = 0)
                       ''')
 
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'upgraded_cluster'))
@@ -374,7 +374,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c = conn.cursor()
             c.execute('''
                       create table doc.test(id int primary key, data text) clustered into 1 shards with(
-                       "unassigned.node_left.delayed_timeout" = '100ms', "number_of_replicas" = 2)
+                       "unassigned.node_left.delayed_timeout" = '20s', "number_of_replicas" = 2)
                       ''')
 
             inserts = [(i, str(random.randint)) for i in range(0, 100)]
@@ -481,7 +481,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             c = conn.cursor()
             number_of_replicas = random.randint(0, 2)
             c.execute('''
-                        create table doc.test(x int) clustered into 1 shards with( number_of_replicas =?,
+                        create table doc.test(x int) clustered into 1 shards with(number_of_replicas =?,
                         "soft_deletes.enabled" = true)
                      ''', (number_of_replicas, ))
 
@@ -537,7 +537,7 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             node_ids = c.fetchall()
             self.assertEqual(len(node_ids), number_of_nodes)
 
-            c.execute('''create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" = ?)''',
+            c.execute('''create table doc.test(x int) clustered into 1 shards with("number_of_replicas" = ?)''',
                       (f"0-{number_of_replicas}",))
             assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
 
@@ -631,8 +631,8 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
                 '''create table doc.test(x int) clustered into ? shards with(
                     "number_of_replicas" = ?,
                     "soft_deletes.enabled" = false,
-                    "allocation.max_retries" = 0,
-                    "unassigned.node_left.delayed_timeout" = '100ms'
+                    "allocation.max_retries" = 10,
+                    "unassigned.node_left.delayed_timeout" = '20s'
                     )''',
                 (number_of_shards, number_of_replicas,))
 
