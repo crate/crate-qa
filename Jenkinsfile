@@ -21,7 +21,7 @@ pipeline {
             sh 'env/bin/flake8 src/ tests/'
           }
         }
-        stage('Python bwc tests') {
+        stage('Python bwc-rolling-upgrade tests') {
           agent { label 'medium' }
           steps {
             checkout scm
@@ -31,7 +31,35 @@ pipeline {
               source env/bin/activate
               python -m pip install -U -e .
 
-              (cd tests && python -m unittest discover -vvvf -s bwc)
+              (cd tests/bwc && python -m unittest -vvvf test_rolling_upgrade.py)
+            '''
+          }
+        }
+        stage('Python bwc-hotfix_downgrades tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvvf test_hotfix_downgrades.py)
+            '''
+          }
+        }
+        stage('Python bwc-upgrade tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvvf test_upgrade.py)
             '''
           }
         }
