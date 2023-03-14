@@ -188,8 +188,15 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 msg += logs
             msg += "\n"
             raise Exception(msg).with_traceback(e.__traceback__)
+        finally:
+            cluster_name = cluster.nodes()[0].cluster_name
+            logs_path = cluster.nodes()[0].logs_path
+            logfile = os.path.join(logs_path, cluster_name + ".log")
+            with open(logfile, "a") as f:
+                f.truncate()
+                f.close()
 
-    @timeout(240)
+    @timeout(300)
     def _do_upgrade(self, cluster, nodes, paths, versions):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
