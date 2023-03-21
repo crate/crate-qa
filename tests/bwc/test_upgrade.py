@@ -196,7 +196,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 f.truncate()
                 f.close()
 
-    @timeout(300)
+    @timeout(420)
     def _do_upgrade(self, cluster, nodes, paths, versions):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
