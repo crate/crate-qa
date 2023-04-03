@@ -21,6 +21,37 @@ afterEach(async () => {
 
 
 
+test("can use cursor to fetch subset of result with many reads", async () => {
+  const stmt = "SELECT * FROM generate_series(1, 35)";
+  const cursor = conn.query(new Cursor(stmt));
+
+  let res1 = await cursor.read(5);
+  let res2 = await cursor.read(10);
+  let res3 = await cursor.read(10);
+
+  expect(res1).toHaveLength(5);
+  expect(res2).toHaveLength(10);
+  expect(res3).toHaveLength(10);
+
+  await cursor.close();
+});
+
+
+test("can use cursor to fetch full result with many reads", async () => {
+  const stmt = "SELECT * FROM generate_series(1, 7)";
+  const cursor = conn.query(new Cursor(stmt));
+
+  let res1 = await cursor.read(5);
+  let res2 = await cursor.read(10);
+
+  expect(res1).toHaveLength(5);
+  expect(res2).toHaveLength(2);
+
+  await cursor.close();
+});
+
+
+
 describe("queries on table", () => {
   beforeEach(async () => {
     await pool.query(`
