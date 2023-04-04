@@ -17,7 +17,8 @@ UPGRADE_PATHS = [
     UpgradePath('4.8.x', '5.0.x'),
     UpgradePath('5.0.x', '5.1.x'),
     UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', 'latest-nightly')
+    UpgradePath('5.2.x', '5.3.x'),
+    UpgradePath('5.3.x', 'latest-nightly')
 ]
 UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', '4.4.x')]
 
