@@ -8,7 +8,7 @@ import tempfile
 import functools
 from pprint import pformat
 from threading import Thread
-from typing import Dict, Any, NamedTuple, Iterable, List
+from typing import Dict, Any, NamedTuple, Iterable, List, Optional
 from distutils.version import StrictVersion as V
 from faker.generator import random
 from glob import glob
@@ -184,21 +184,27 @@ class NodeProvider:
             for x in range(num)
         ])
 
-    def _new_cluster(self, version, num_nodes, data_paths=None, settings=None, env=None):
+    def _new_cluster(self,
+                     version,
+                     num_nodes: int,
+                     data_paths: Optional[List[str]] = None,
+                     settings: Optional[Dict[str, str]] = None,
+                     env=None) -> CrateCluster:
         """ data_paths has 'num_nodes' elements and data_paths[i] stores path of the i-th node. 'None' if called first time."""
-        self.assertTrue(hasattr(self, '_new_node'))
+        assert hasattr(self, '_new_node'), "NodeProvider must have _new_node method"
         settings = settings or {}
         for port in ['transport.tcp.port', 'http.port', 'psql.port']:
-            self.assertNotIn(port, settings)
+            assert port not in settings, f"Must not define {port} in settings"
+        cluster_name = gen_id()
         s = {
-            'cluster.name': gen_id(),
+            'cluster.name': cluster_name,
             'gateway.recover_after_nodes': num_nodes,
             'gateway.expected_nodes': num_nodes
         }
         s.update(settings)
         nodes = []
         for id in range(num_nodes):
-            s['node.name'] = s['cluster.name'] + '-' + str(id)
+            s['node.name'] = cluster_name + '-' + str(id)
             """ We want to preserve data_paths when we start cluster second time during a test.
             Path is taken from the first start.
             """
@@ -252,6 +258,8 @@ class NodeProvider:
             """
             if "path.data" not in s:
                 s['path.data'] = self.mkdtemp()
+            if "path.logs" not in s:
+                s["path.logs"] = self.mkdtemp()
 
             s = remove_unsupported_settings(v, s)
             e = {

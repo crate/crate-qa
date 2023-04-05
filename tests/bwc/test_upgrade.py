@@ -137,7 +137,7 @@ def get_test_paths():
             yield versions
 
 
-def path_repr(path):
+def path_repr(path: VersionDef) -> str:
     """
     String representation of the upgrade path in the format::
 
@@ -161,7 +161,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             finally:
                 self.tearDown()
 
-    def _test_upgrade_path(self, versions: Tuple[VersionDef], nodes):
+    def _test_upgrade_path(self, versions: Tuple[VersionDef], nodes: int):
         """ Test upgrade path across specified versions.
 
         Creates a blob and regular table in first version and inserts a record,
@@ -177,24 +177,26 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             self._do_upgrade(cluster, nodes, paths, versions)
         except Exception as e:
             msg = ""
-            cluster_name = cluster.nodes()[0].cluster_name
-            logs_path = cluster.nodes()[0].logs_path
-
             msg = "\nLogs\n"
-            msg += "--------------\n"
-            logfile = os.path.join(logs_path, cluster_name + ".log")
-            with open(logfile, "r") as f:
-                logs = f.read()
-                msg += logs
-            msg += "\n"
+            msg += "==============\n"
+            for i, node in enumerate(cluster.nodes()):
+                msg += f"-------------- node: {i}\n"
+                logs_path = node.logs_path
+                cluster_name = node.cluster_name
+                logfile = os.path.join(logs_path, cluster_name + ".log")
+                with open(logfile, "r") as f:
+                    logs = f.read()
+                    msg += logs
+                msg += "\n"
             raise Exception(msg).with_traceback(e.__traceback__)
         finally:
             cluster_name = cluster.nodes()[0].cluster_name
-            logs_path = cluster.nodes()[0].logs_path
-            logfile = os.path.join(logs_path, cluster_name + ".log")
-            with open(logfile, "a") as f:
-                f.truncate()
-                f.close()
+            for node in cluster.nodes():
+                logs_path = node.logs_path
+                logfile = os.path.join(logs_path, cluster_name + ".log")
+                with open(logfile, "a") as f:
+                    f.truncate()
+                    f.close()
 
     @timeout(420)
     def _do_upgrade(self, cluster, nodes, paths, versions):
