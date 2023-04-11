@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import threading
 import unittest
@@ -156,6 +157,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
     def test_upgrade_paths(self):
         for path in get_test_paths():
+            print(f"Upgrade path={[x.version for x in path]}", file=sys.stderr)
             try:
                 self.setUp()
                 self._test_upgrade_path(path, nodes=3)
@@ -230,6 +232,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
     def assert_data_persistence(self, version_def, nodes, digest, paths):
         env = prepare_env(version_def.java_home)
         version = version_def.version
+        print(f"Upgrading to {version}", file=sys.stderr)
         cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
