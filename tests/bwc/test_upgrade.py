@@ -8,6 +8,7 @@ from io import BytesIO
 
 from cr8.run_crate import wait_until
 from crate.client import connect
+from crate.client.connection import Connection
 from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import (
     VersionDef,
@@ -202,6 +203,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
     def _do_upgrade(self, cluster, nodes, paths, versions):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
+            assert_busy(lambda: self.assert_nodes(conn, nodes))
             c = conn.cursor()
             c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
@@ -250,12 +252,17 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 )
         self._process_on_stop()
 
-    def assert_green(self, conn: connect, schema: str, table_name: str):
+    def assert_green(self, conn: Connection, schema: str, table_name: str):
         c = conn.cursor()
         c.execute('select health from sys.health where table_name=? and table_schema=?', (table_name, schema))
         response = c.fetchone()
         self.assertNotIsInstance(response, type(None))
         self.assertEqual(response[0], 'GREEN')
+
+    def assert_nodes(self, conn: Connection, num_nodes: int):
+        c = conn.cursor()
+        c.execute("select count(*) from sys.nodes")
+        self.assertEqual(c.fetchone()[0], num_nodes)
 
 
 class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
