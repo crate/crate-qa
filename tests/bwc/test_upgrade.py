@@ -3,6 +3,7 @@ import sys
 import shutil
 import threading
 import unittest
+import subprocess
 from uuid import uuid4
 from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
@@ -158,6 +159,10 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
     def test_upgrade_paths(self):
         for path in get_test_paths():
             print(f"Upgrade path={[x.version for x in path]}", file=sys.stderr)
+            out = subprocess.check_output(["jps"], universal_newlines=True)
+            print("Existing processes:", file=sys.stderr)
+            for line in out.split("\n"):
+                print(line, file=sys.stderr)
             try:
                 self.setUp()
                 self._test_upgrade_path(path, nodes=3)
