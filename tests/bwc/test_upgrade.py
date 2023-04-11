@@ -496,18 +496,16 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('3.3.x', '4.x.x')
+    VERSION = ('4.0.x', '5.x.x')
 
     def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when upgrading 3.3.x -> 4.x.x
+        """Test snapshot compatibility when upgrading 4.0.x -> 5.x.x
 
         Using Minio as a S3 repository, the first cluster that runs
         creates the repo, a table and inserts/selects some data, which
         then is snapshotted and deleted. The next cluster recovers the
         data from the last snapshot, performs further inserts/selects,
         to then snapshot the data and delete it.
-
-        We are interested in the transition 3.3.x -> 4.x.x
         """
         with MinioServer() as minio:
             t = threading.Thread(target=minio.run)
