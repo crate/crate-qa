@@ -49,6 +49,9 @@ namespace stock_npgsql
     {
         public static async Task TestUnnestAsync(NpgsqlConnection conn)
         {
+            using (var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS mm.data_table", conn)) {
+                cmd.ExecuteNonQuery();
+            }
             using var command = new NpgsqlCommand(
                 connection: conn,
                 cmdText: "CREATE TABLE mm.data_table (id int, name text)"
@@ -94,6 +97,9 @@ namespace stock_npgsql
                 Debug.Assert(mountains[0] == "Acherkogel");
             }
 
+            using (var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS tbl", conn)) {
+                cmd.ExecuteNonQuery();
+            }
             using (var cmd = new NpgsqlCommand("CREATE TABLE tbl (x int)", conn)) {
                 cmd.ExecuteNonQuery();
             }
@@ -134,7 +140,7 @@ namespace stock_npgsql
 
         private static async Task TestInsertUsingEntityFramework(NpgsqlConnection conn)
         {
-            using (var cmd = new NpgsqlCommand("drop table if exists test.test", conn))
+            using (var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS test.test", conn))
             {
                 await cmd.ExecuteNonQueryAsync();
             }
