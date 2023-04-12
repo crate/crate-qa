@@ -29,7 +29,7 @@ UPGRADE_PATHS = (
         VersionDef('4.1.x', []),
         VersionDef('4.2.x', []),
         VersionDef('4.3.x', []),
-        #VersionDef('4.4.x', []),
+        VersionDef('4.4.x', []),
         VersionDef('4.5.x', []),
         VersionDef('4.6.x', []),
         VersionDef('4.7.x', []),
@@ -220,6 +220,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 ''')
             insert_data(conn, 'doc', 't1', 10)
             c.execute(CREATE_BLOB_TABLE)
+            assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
+
             run_selects(c, versions[0].version)
             container = conn.get_blob_container('b1')
             digest = container.put(BytesIO(b'sample data'))
