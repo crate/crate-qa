@@ -153,6 +153,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
     CLUSTER_SETTINGS = {
         'cluster.name': gen_id(),
+        "transport.netty.worker_count": 16,
     }
 
     def test_upgrade_paths(self):
