@@ -47,7 +47,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         shards, replicas = (nodes, 1)
         expected_active_shards = shards + shards * replicas
 
-        cluster = self._new_cluster(path.from_version, nodes)
+        settings = {
+            "transport.netty.worker_count": 16
+        }
+        cluster = self._new_cluster(path.from_version, nodes, settings=settings)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
