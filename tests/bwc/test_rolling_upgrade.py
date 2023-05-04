@@ -57,11 +57,20 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             c.execute(f'''
                 CREATE TABLE doc.t1 (
                     type BYTE,
-                    value FLOAT
+                    value FLOAT,
+                    title string,
+                    author object as (
+                        name string
+                    ),
+                    index composite_nested_ft using fulltext(title, author['name']) with(analyzer = 'stop')
                 ) CLUSTERED INTO {shards} SHARDS
                 WITH (number_of_replicas={replicas})
             ''')
             insert_data(conn, 'doc', 't1', 1000)
+
+            c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (1, 1, 'matchMe title', {name='no match name'})")
+            c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (2, 2, 'no match title', {name='matchMe name'})")
+
             c.execute(f'''
                 CREATE TABLE doc.parted (
                     id INT,
@@ -102,6 +111,22 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     LIMIT 1
                 ''')
                 c.fetchone()
+
+                # Ensure match queries work. Table level dedicated index column mapping has been changed in 5.4.
+                c.execute('''
+                    SELECT title, author
+                    FROM doc.t1
+                    WHERE MATCH(composite_nested_ft, 'matchMe')
+                    ORDER BY value
+                ''')
+                res = c.fetchall()
+                self.assertEqual(len(res), 2)
+                # only title matches
+                self.assertEqual(res[0][0], 'matchMe title')
+                self.assertEqual(res[0][1], {'name': 'no match name'})
+                # only name matches
+                self.assertEqual(res[1][0], 'no match title')
+                self.assertEqual(res[1][1], {'name': 'matchMe name'})
 
                 # Ensure that inserts, which will create a new partition, are working while upgrading
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
