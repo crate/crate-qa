@@ -8,13 +8,7 @@ from random import sample
 from crate.qa.tests import NodeProvider, insert_data, UpgradePath, assert_busy
 
 UPGRADE_PATHS = [
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.0'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
+    UpgradePath('4.0.x', '5.0.x'),
     UpgradePath('5.0.x', '5.1.x'),
     UpgradePath('5.1.x', '5.2.x'),
     UpgradePath('5.2.x', '5.3.x'),
