@@ -35,6 +35,20 @@ pipeline {
             '''
           }
         }
+        stage('Python bwc-ingest-rolling-upgrade tests') {
+          agent { label 'medium' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              /usr/bin/python3 -m venv env
+              source env/bin/activate
+              python -m pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvvf test_ingest_rolling_upgrade.py)
+            '''
+          }
+        }
         stage('Python bwc-hotfix_downgrades tests') {
           agent { label 'medium' }
           steps {
