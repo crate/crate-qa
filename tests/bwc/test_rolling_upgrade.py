@@ -67,6 +67,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 ) CLUSTERED INTO {shards} SHARDS
                 WITH (number_of_replicas={replicas})
             ''')
+            c.execute("CREATE VIEW doc.v1 AS SELECT type, title, value FROM doc.t1")
             insert_data(conn, 'doc', 't1', 1000)
 
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (1, 1, 'matchMe title', {name='no match name'})")
@@ -111,6 +112,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     WHERE value > 1
                     LIMIT 1
                 ''')
+                c.fetchone()
+                c.execute('SELECT type, value + 1 FROM doc.v1 WHERE value > 1 LIMIT 1')
                 c.fetchone()
 
                 # Ensure match queries work. Table level dedicated index column mapping has been changed in 5.4.
