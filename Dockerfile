@@ -1,9 +1,9 @@
-FROM rust:latest
+FROM rust:1.72
 
 RUN \
   apt-get update && \
   apt-get -y upgrade && \
-  apt-get -y install openjdk-11-jdk python3-venv python3-dev
+  apt-get -y --no-install-recommends install openjdk-17-jdk python3-venv python3-dev
 
 ENV HOME /root
 WORKDIR /root
