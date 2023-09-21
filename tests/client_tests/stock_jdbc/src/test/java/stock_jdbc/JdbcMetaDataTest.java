@@ -417,7 +417,6 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/10131")
     public void test_getProcedureColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             conn.getMetaData().getProcedureColumns("", "", "", "");
@@ -432,7 +431,6 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("pg_function_is_visible https://github.com/crate/crate/issues/10132")
     public void test_getProcedures() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             conn.getMetaData().getProcedures("", "", "");
@@ -533,7 +531,6 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9568")
     public void test_getTablePrivileges() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getTablePrivileges("", "sys", "summits");
@@ -568,7 +565,6 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9320")
     public void test_getTypeInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getTypeInfo();
@@ -576,7 +572,6 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("https://github.com/crate/crate/issues/9320")
     public void test_getUDTs() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getUDTs("", "sys", "t", new int[0]);
