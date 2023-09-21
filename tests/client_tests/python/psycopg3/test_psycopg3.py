@@ -94,6 +94,19 @@ async def bitstring_can_be_inserted_and_selected_using_binary_encoding(test, con
     """
 
 
+async def float_vector_can_be_inserted_and_selected(test, conn):
+    fv = [1.1, 2.2, 3.3, 4.4]
+    await conn.execute('drop table if exists tbl_fv')
+    await conn.execute('create table tbl_fv (id int, fv float_vector(4))')
+    await conn.execute('insert into tbl_fv (id, fv) values (1, [1.1, 2.2, 3.3, 4.4])')
+    await conn.execute('insert into tbl_fv (id, fv) values (2, null)')
+    await conn.execute('refresh table tbl_fv')
+    cur = await conn.execute('select * from tbl_fv order by id')
+    result = await cur.fetchall()
+    test.assertEqual(result[0][1], fv)
+    test.assertEqual(result[1][1], None)
+
+
 async def fetch_summits_client_cursor(test, uri):
     """
     Use the `cursor.execute` method to acquire results, using a client-side cursor.
@@ -170,6 +183,7 @@ async def exec_queries_pooled(test, uri):
         await basic_queries(test, conn)
         await record_type_can_be_read_using_binary_streaming(test, conn)
         await bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn)
+        await float_vector_can_be_inserted_and_selected(test, conn)
     await pool.close()
 
 
