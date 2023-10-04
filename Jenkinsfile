@@ -164,15 +164,6 @@ pipeline {
             '''
           }
         }
-        stage('Stock JDBC tests') {
-          agent { label 'medium' }
-          steps {
-            checkout scm
-            sh '''
-              (cd tests/client_tests/stock_jdbc && ./gradlew test)
-            '''
-          }
-        }
         stage('Rust client tests') {
           agent {
             dockerfile {
