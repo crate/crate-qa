@@ -63,6 +63,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     author object as (
                         name string
                     ),
+                    o object(ignored) as (a int),
                     index composite_nested_ft using fulltext(title, author['name']) with(analyzer = 'stop')
                 ) CLUSTERED INTO {shards} SHARDS
                 WITH (number_of_replicas={replicas})
@@ -72,6 +73,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (1, 1, 'matchMe title', {name='no match name'})")
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (2, 2, 'no match title', {name='matchMe name'})")
+
+            c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
 
             c.execute(f'''
                 CREATE TABLE doc.parted (
@@ -131,6 +134,19 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 # only name matches
                 self.assertEqual(res[1][0], 'no match title')
                 self.assertEqual(res[1][1], {'name': 'matchMe name'})
+
+                # Dynamically added empty arrays and ignored object sub-columns are indexed with special prefix starting from 5.5
+                # Ensure that reading such columns work across all versions.
+                # Related to https://github.com/crate/crate/commit/278d45f176e7d1d3215118255cd69afd2d3786ee
+                c.execute('''
+                    SELECT author, o['dyn_ignored_subcol']
+                    FROM doc.t1
+                    WHERE title = 'prefix_check'
+                ''')
+                res = c.fetchall()
+                self.assertEqual(len(res), 1)
+                self.assertEqual(res[0][0], {'dyn_empty_array': []})
+                self.assertEqual(res[0][1], 'hello')
 
                 # Ensure that inserts, which will create a new partition, are working while upgrading
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
