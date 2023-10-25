@@ -31,7 +31,6 @@ setup(
     namespace_packages=['crate'],
     install_requires=[
         'crate',
-        'argh==0.29.4',
         'cr8>=0.25.0',
         'Cython',
         'asyncpg>=0.21',

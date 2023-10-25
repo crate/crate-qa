@@ -135,7 +135,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U argh==0.29.4 cr8 crash
+              python -m pip install -U cr8 crash
               cd ${HOME}/tests/client_tests/go
               test -f go.mod && rm go.mod
               test -f go.sum && rm go.sum
@@ -160,7 +160,6 @@ pipeline {
               python3 -m venv env
               . env/bin/activate
               python -m pip install -U cr8
-               
               ./tests/client_tests/haskell/run.sh
             '''
           }
@@ -187,7 +186,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U argh==0.29.4 cr8
+              python -m pip install -U cr8
               (cd tests/client_tests/rust/ && ./run.sh)
             '''
           }
@@ -223,7 +222,7 @@ pipeline {
               #       it screws something up with the following procedure.
               #       - https://github.com/nodejs/node-gyp/pull/1815
               #       - https://github.com/nodejs/node-gyp/issues/2144
-              python3 -m pip install --upgrade cr8
+              pip3 install --upgrade cr8
 
               # Upgrade `node-gyp`.
               # https://github.com/nodejs/node-gyp/issues/2272
@@ -268,7 +267,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U argh==0.29.4 cr8
+              python -m pip install -U cr8
               (cd tests/client_tests/stock_npgsql && ./run.sh)
             '''
           }
