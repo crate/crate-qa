@@ -10,7 +10,7 @@ pipeline {
     stage('Parallel') {
       parallel {
         stage('Lint python code') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh 'rm -rf env'
@@ -22,7 +22,7 @@ pipeline {
           }
         }
         stage('Python bwc-rolling-upgrade tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -36,7 +36,7 @@ pipeline {
           }
         }
         stage('Python bwc-hotfix_downgrades tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -50,7 +50,7 @@ pipeline {
           }
         }
         stage('Python bwc-upgrade tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -64,7 +64,7 @@ pipeline {
           }
         }
         stage('Python restart tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -78,7 +78,7 @@ pipeline {
           }
         }
         stage('Python startup tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -92,7 +92,7 @@ pipeline {
           }
         }
         stage('Python sqllogic tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -107,7 +107,7 @@ pipeline {
           }
         }
         stage('Python client tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -123,7 +123,7 @@ pipeline {
         stage('Go client tests') {
           agent {
             dockerfile {
-              label 'docker'
+              label 'docker && x64'
               filename 'tests/client_tests/go/Dockerfile'
             }
           }
@@ -146,7 +146,7 @@ pipeline {
         stage('Haskell client tests') {
           agent {
             dockerfile {
-              label 'docker'
+              label 'docker && x64'
               filename 'tests/client_tests/haskell/Dockerfile'
             }
           }
@@ -165,7 +165,7 @@ pipeline {
           }
         }
         stage('Stock JDBC tests') {
-          agent { label 'medium' }
+          agent { label 'medium && x64' }
           steps {
             checkout scm
             sh '''
@@ -176,7 +176,7 @@ pipeline {
         stage('Rust client tests') {
           agent {
             dockerfile {
-              label 'docker'
+              label 'docker && x64'
             }
           }
           steps {
@@ -194,7 +194,7 @@ pipeline {
         stage('Node.js client tests') {
           agent {
             dockerfile {
-              label 'docker'
+              label 'docker && x64'
               filename 'tests/client_tests/node-postgres/Dockerfile'
 
               // Run container as root user.
@@ -255,7 +255,7 @@ pipeline {
         stage('npgsql client tests') {
           agent {
             dockerfile {
-              label 'docker'
+              label 'docker && x64'
               filename 'tests/client_tests/stock_npgsql/Dockerfile'
             }
           }
@@ -274,7 +274,7 @@ pipeline {
         }
         stage('kafka-connect jdbc tests') {
           agent {
-            label 'docker && medium'
+            label 'docker && medium && x64'
           }
           steps {
             checkout scm
