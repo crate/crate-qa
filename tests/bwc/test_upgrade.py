@@ -66,7 +66,7 @@ CREATE TABLE t1 (
     col_ip IP,
     col_timestamp TIMESTAMP,
     text STRING,
-    INDEX text_ft USING FULLTEXT(text) WITH (analyzer=myanalysis)
+    INDEX text_ft USING FULLTEXT(text) WITH (analyzer='myanalysis')
 ) CLUSTERED INTO 3 SHARDS WITH (number_of_replicas = 0)
 '''
 
