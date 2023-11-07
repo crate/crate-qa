@@ -149,6 +149,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 self.assertEqual(res[0][0], {'dyn_empty_array': []})
                 self.assertEqual(res[0][1], 'hello')
 
+                # Ensure that inserts are working while upgrading
+                c.execute(
+                    "INSERT INTO doc.t1 (type, value, title, author) VALUES (3, 3, 'some title', {name='nothing to see, move on'})")
+
                 # Ensure that inserts, which will create a new partition, are working while upgrading
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
                 # Add the shards of the new partition primaries
