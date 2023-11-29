@@ -1,4 +1,4 @@
-FROM haskell:8.10
+FROM haskell:9
 
 RUN \
   apt-get update && \
