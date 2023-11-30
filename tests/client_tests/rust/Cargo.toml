@@ -2,7 +2,7 @@
 name = "rust-cratedb-tests"
 version = "0.1.0"
 authors = ["Mathias Fussenegger <mathias@crate.io>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 postgres = "0.19.7"
