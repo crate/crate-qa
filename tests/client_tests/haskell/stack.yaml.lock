@@ -7,13 +7,13 @@ packages:
 - completed:
     hackage: HDBC-postgresql-2.5.0.1@sha256:37bb911cd996d12c91fa711002877f32f91bcc488de76d85a05865c3af9dc580,3032
     pantry-tree:
-      size: 1611
       sha256: bb1e349a28844e59ed36e1a3963cd6946e57f5e39244a6d36397d6291d68a138
+      size: 1611
   original:
     hackage: HDBC-postgresql-2.5.0.1@sha256:37bb911cd996d12c91fa711002877f32f91bcc488de76d85a05865c3af9dc580,3032
 snapshots:
 - completed:
-    size: 587821
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/24.yaml
-    sha256: 06d844ba51e49907bd29cb58b4a5f86ee7587a4cd7e6cf395eeec16cba619ce8
-  original: lts-18.24
+    sha256: 8809197159ce65ec2d66f91982e4844ad0c2cbd1126df42146dd103c0ea6cac0
+    size: 640063
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/23.yaml
+  original: lts-21.23
