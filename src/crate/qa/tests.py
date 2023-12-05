@@ -316,7 +316,13 @@ class NodeProvider:
         self._log_consumers.clear()
 
     def _has_error(self) -> bool:
-        return any(error for (_, error) in self._outcome.errors)  # type: ignore
+        # _outcome is set if NodeProvider is mixed with TestCase
+        outcome = getattr(self, "_outcome", None)
+        if not outcome:
+            return False
+        if hasattr(outcome, "success"):
+            return not outcome.success
+        return any(error for (_, error) in outcome.errors)  # type: ignore
 
 
 def assert_busy(assertion, timeout=120, f=2.0):
