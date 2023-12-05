@@ -3,7 +3,6 @@ import unittest
 from pathlib import Path
 
 from crate.client import connect
-from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import NodeProvider
 from faker import Faker
 from faker.config import AVAILABLE_LOCALES
@@ -67,83 +66,6 @@ class StartupTest(NodeProvider, unittest.TestCase):
             ''')
             res = cur.fetchone()
             self.assertEqual(res[0], is_enterprise)
-
-    def test_enterprise_enabled(self):
-        settings = dict({
-            'license.enterprise': True,
-            'lang.js.enabled': randbool(),
-            'auth.host_based.enabled': randbool(),
-            'auth.host_based.config.0.user': 'crate',
-            'auth.host_based.config.0.host': '127.0.0.1',
-            'auth.host_based.config.0.protocol': 'http',
-        })
-
-        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
-        if version_tuple >= (4, 0, 0):
-            # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
-            return
-
-        node.start()
-
-        self._assert_enterprise_equal(node, True)
-
-        with connect(node.http_url, error_trace=True) as conn:
-            cur = conn.cursor()
-            # User Management
-            cur.execute('''
-                SELECT name, superuser FROM sys.users
-            ''')
-            res = cur.fetchone()
-            self.assertEqual(res[0], 'crate')
-            self.assertEqual(res[1], True)
-
-            # UDF Javascript
-            if settings['lang.js.enabled']:
-                cur.execute('''
-                    CREATE FUNCTION js_add(LONG, LONG) RETURNS LONG
-                    LANGUAGE javascript
-                    AS 'function js_add(a, b) { return a + b; }'
-                ''')
-                cur.execute('''
-                    SELECT routine_name, routine_body
-                    FROM information_schema.routines
-                    WHERE routine_type = 'FUNCTION'
-                ''')
-                res = cur.fetchone()
-                self.assertEqual(res[0], 'js_add')
-                self.assertEqual(res[1], 'javascript')
-
-    def test_enterprise_disabled(self):
-        settings = dict({
-            'license.enterprise': False,
-        })
-
-        (node, version_tuple) = self._new_node(self.CRATE_VERSION, settings=settings)
-        if version_tuple >= (4, 0, 0):
-            # disable/enable enterprise functionality is not possible anymore from version 4.0.0 on
-            return
-
-        node.start()
-
-        self._assert_enterprise_equal(node, False)
-
-        with connect(node.http_url, error_trace=True) as conn:
-            cur = conn.cursor()
-            # User Management
-            with self.assertRaisesRegex(ProgrammingError,
-                                        'Relation \'sys.users\' unknown'):
-                cur.execute('''
-                    SELECT name, superuser
-                    FROM sys.users
-                ''')
-            # UDF Javascript
-            with self.assertRaisesRegex(ProgrammingError,
-                                        '\'javascript\' is not a valid UDF language'):
-                cur.execute('''
-                    CREATE FUNCTION js_add(LONG, LONG) RETURNS LONG
-                    LANGUAGE javascript
-                    AS 'function js_add(a, b) { return a + b; }'
-                ''')
 
     def test_startup_logs(self):
 
