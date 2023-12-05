@@ -8,16 +8,17 @@ import tempfile
 import functools
 from pprint import pformat
 from threading import Thread
-from typing import Dict, Any, NamedTuple, Iterable, List, Optional
-from distutils.version import StrictVersion as V
+from typing import Dict, Any, NamedTuple, Iterable, List, Optional, Tuple
+
 from faker.generator import random
 from glob import glob
-from cr8.run_crate import CrateNode, get_crate, _extract_version
+from cr8.run_crate import CrateNode, get_crate, _extract_version, parse_version
 from cr8.insert_fake_data import SELLECT_COLS, Column, create_row_generator
 from cr8.insert_json import to_insert
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
-CRATEDB_0_57 = V('0.57.0')
+
+CRATEDB_0_57 = (0, 57, 0)
 
 
 print_error = functools.partial(print, file=sys.stderr)
@@ -47,33 +48,29 @@ def gen_id() -> str:
     return ''.join([random.choice(string.hexdigits) for x in range(12)])
 
 
-def test_settings(version: V) -> Dict[str, Any]:
+def test_settings(version: Tuple[int, int, int]) -> Dict[str, Any]:
     s = {
         'cluster.routing.allocation.disk.watermark.low': '1024k',
         'cluster.routing.allocation.disk.watermark.high': '512k',
     }
-    if version >= V('3.0'):
+    if version >= (3, 0, 0):
         s.update({
             'cluster.routing.allocation.disk.watermark.flood_stage': '256k',
         })
     return s
 
 
-def remove_unsupported_settings(version: V, settings: dict) -> Dict[str, Any]:
+def remove_unsupported_settings(version: Tuple[int, int, int], settings: dict) -> Dict[str, Any]:
     new_settings = dict(settings)
-    if version >= V('4.0.0'):
+    if version >= (4, 0, 0):
         new_settings.pop('license.enterprise', None)
     return new_settings
-
-
-def version_tuple_to_strict_version(version_tuple: tuple) -> V:
-    return V('.'.join([str(v) for v in version_tuple]))
 
 
 def columns_for_table(conn, schema, table):
     c = conn.cursor()
     c.execute("SELECT min(version['number']) FROM sys.nodes")
-    version = V(c.fetchone()[0])
+    version = parse_version(c.fetchone()[0])
     stmt = SELLECT_COLS.format(
         schema_column_name='table_schema' if version >= CRATEDB_0_57 else 'schema_name')
     c.execute(stmt, (schema, table, ))
@@ -245,12 +242,11 @@ class NodeProvider:
         def new_node(version, settings=None, env=None):
             crate_dir = get_crate(version)
             version_tuple = _extract_version(crate_dir)
-            v = version_tuple_to_strict_version(version_tuple)
             s = {
                 'cluster.name': 'crate-qa',
             }
             s.update(settings or {})
-            s.update(test_settings(v))
+            s.update(test_settings(version_tuple))
 
             """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
             However, we don't want to re-generate data path if we create a node based on existing settings, for example
@@ -261,7 +257,7 @@ class NodeProvider:
             if "path.logs" not in s:
                 s["path.logs"] = self.mkdtemp()
 
-            s = remove_unsupported_settings(v, s)
+            s = remove_unsupported_settings(version_tuple, s)
             e = {
                 'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
                 'CRATE_DISABLE_GC_LOGGING': '1',
@@ -270,7 +266,7 @@ class NodeProvider:
             e.update(env or {})
 
             if self.DEBUG:
-                print(f'# Running CrateDB {version} ({v}) ...')
+                print(f'# Running CrateDB {version} ({version_tuple}) ...')
                 s_nice = pformat(s)
                 print(f'with settings: {s_nice}')
                 e_nice = pformat(e)
