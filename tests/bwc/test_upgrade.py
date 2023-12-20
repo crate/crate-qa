@@ -12,6 +12,7 @@ from crate.client.connection import Connection
 from crate.client.exceptions import ProgrammingError
 from crate.qa.tests import (
     VersionDef,
+    CrateCluster,
     NodeProvider,
     wait_for_active_shards,
     insert_data,
@@ -166,7 +167,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             finally:
                 self.tearDown()
 
-    def _test_upgrade_path(self, versions: Tuple[VersionDef], nodes: int):
+    def _test_upgrade_path(self, versions: Tuple[VersionDef, ...], nodes: int):
         """ Test upgrade path across specified versions.
 
         Creates a blob and regular table in first version and inserts a record,
@@ -174,6 +175,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         few simple selects work.
         """
         version_def = versions[0]
+        print(f"\nStart version: {version_def.version}")
         env = prepare_env(version_def.java_home)
         cluster = self._new_cluster(
             version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
@@ -204,14 +206,24 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     f.close()
 
     @timeout(420)
-    def _do_upgrade(self, cluster, nodes, paths, versions):
+    def _do_upgrade(self,
+                    cluster: CrateCluster,
+                    nodes: int,
+                    paths: Iterable[str],
+                    versions: Tuple[VersionDef, ...]):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             assert_busy(lambda: self.assert_nodes(conn, nodes))
             c = conn.cursor()
+
             c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
             c.execute(CREATE_PARTED_TABLE)
+
+            c.execute("DROP USER IF EXISTS trillian")
+            c.execute("CREATE USER trillian")
+            c.execute("GRANT DQL ON TABLE t1 TO trillian")
+
             c.execute('''
                     INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
                 ''')
@@ -227,12 +239,17 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
         self._process_on_stop()
         for version_def in versions[1:]:
+            print(f"    Upgrade to: {version_def.version}")
             self.assert_data_persistence(version_def, nodes, digest, paths)
         # restart with latest version
         version_def = versions[-1]
         self.assert_data_persistence(version_def, nodes, digest, paths)
 
-    def assert_data_persistence(self, version_def, nodes, digest, paths):
+    def assert_data_persistence(self,
+                                version_def: VersionDef,
+                                nodes: int,
+                                digest: str,
+                                paths: Iterable[str]):
         env = prepare_env(version_def.java_home)
         version = version_def.version
         cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
@@ -245,6 +262,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             container = conn.get_blob_container('b1')
             container.get(digest)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
+
+            cursor.execute("select name from sys.users order by 1")
+            self.assertEqual(cursor.fetchall(), [["crate"], ["trillian"]])
 
             # older versions had a bug that caused this to fail
             if version in ('latest-nightly', '3.2'):
