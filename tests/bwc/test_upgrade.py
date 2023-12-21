@@ -266,6 +266,9 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor.execute("select name from sys.users order by 1")
             self.assertEqual(cursor.fetchall(), [["crate"], ["trillian"]])
 
+            cursor.execute("select * from sys.privileges")
+            self.assertEqual(cursor.fetchall(), [["TABLE", "trillian", "crate", "doc.t1", "GRANT", "DQL"]])
+
             # older versions had a bug that caused this to fail
             if version in ('latest-nightly', '3.2'):
                 # Test that partition and dynamic columns can be created
