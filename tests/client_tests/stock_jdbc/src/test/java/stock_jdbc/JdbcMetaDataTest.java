@@ -121,7 +121,8 @@ public class JdbcMetaDataTest {
         try (var conn = DriverManager.getConnection(URL)) {
             var result = conn.getMetaData().getCatalogs();
             assertThat(result.next(), is(true));
-            assertThat(result.getString(1), is("doc"));
+            // Returns `crate` as of pgjdbc 42.7.0. It returned `doc` before.
+            assertThat(result.getString(1), is("crate"));
         }
     }
 
