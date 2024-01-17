@@ -64,6 +64,10 @@ def remove_unsupported_settings(version: Tuple[int, int, int], settings: dict) -
     new_settings = dict(settings)
     if version >= (4, 0, 0):
         new_settings.pop('license.enterprise', None)
+    else:
+        new_settings.pop("discovery.seed_hosts", None)
+        new_settings.pop("cluster.initial_master_nodes", None)
+
     return new_settings
 
 
@@ -175,18 +179,13 @@ class NodeProvider:
         self.tmpdirs.append(tmp)
         return os.path.join(tmp, *args)
 
-    def _unicast_hosts(self, num, transport_port=4300):
-        return ','.join([
-            '127.0.0.1:' + str(transport_port + x)
-            for x in range(num)
-        ])
-
     def _new_cluster(self,
                      version,
                      num_nodes: int,
                      data_paths: Optional[List[str]] = None,
                      settings: Optional[Dict[str, str]] = None,
-                     env=None) -> CrateCluster:
+                     env=None,
+                     explicit_discovery=True) -> CrateCluster:
         """ data_paths has 'num_nodes' elements and data_paths[i] stores path of the i-th node. 'None' if called first time."""
         assert hasattr(self, '_new_node'), "NodeProvider must have _new_node method"
         settings = settings or {}
@@ -196,18 +195,24 @@ class NodeProvider:
         s = {
             'cluster.name': cluster_name,
             'gateway.recover_after_nodes': num_nodes,
-            'gateway.expected_nodes': num_nodes
+            'gateway.expected_nodes': num_nodes,
         }
+        if explicit_discovery:
+            s["discovery.seed_hosts"] = ",".join(f"127.0.0.1:{4300 + x}" for x in range(num_nodes))
+            s["cluster.initial_master_nodes"] = ",".join(f"{cluster_name}-{x}" for x in range(num_nodes))
         s.update(settings)
         nodes = []
         for id in range(num_nodes):
-            s['node.name'] = cluster_name + '-' + str(id)
+            node_settings = s.copy()
+            node_settings['node.name'] = cluster_name + '-' + str(id)
+            if explicit_discovery:
+                node_settings["transport.tcp.port"] = 4300 + id
             """ We want to preserve data_paths when we start cluster second time during a test.
             Path is taken from the first start.
             """
             if data_paths is not None:
-                s['path.data'] = data_paths[id]
-            nodes.append(self._new_node(version, s, env)[0])
+                node_settings['path.data'] = data_paths[id]
+            nodes.append(self._new_node(version, node_settings, env)[0])
         return CrateCluster(nodes)
 
     def _new_heterogeneous_cluster(self, versions, settings=None):
