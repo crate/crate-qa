@@ -310,9 +310,12 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     def test_metadata_compatibility(self):
         nodes = 3
 
-        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
-                                    nodes,
-                                    settings=self.CLUSTER_SETTINGS)
+        cluster = self._new_cluster(
+            self.SUPPORTED_VERSIONS[0].version,
+            nodes,
+            settings=self.CLUSTER_SETTINGS,
+            explicit_discovery=False
+        )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -344,7 +347,9 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             nodes,
             data_paths,
             self.CLUSTER_SETTINGS,
-            prepare_env(version_def.java_home))
+            prepare_env(version_def.java_home),
+            explicit_discovery=False
+        )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
@@ -415,7 +420,7 @@ class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             nodes,
             data_paths,
             self.CLUSTER_SETTINGS,
-            prepare_env(version_def.java_home)
+            prepare_env(version_def.java_home),
         )
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
