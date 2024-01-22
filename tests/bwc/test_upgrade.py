@@ -255,6 +255,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
+            assert_busy(lambda: self.assert_nodes(conn, nodes))
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
