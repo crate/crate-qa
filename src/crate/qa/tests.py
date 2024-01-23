@@ -318,6 +318,7 @@ class NodeProvider:
                 for line in lines:
                     print_error(line)
                 print_error('-' * 70)
+                breakpoint()
         self._log_consumers.clear()
 
     def _has_error(self) -> bool:

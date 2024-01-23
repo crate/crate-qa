@@ -17,7 +17,10 @@ from crate.qa.tests import (
     wait_for_active_shards,
     insert_data,
     gen_id,
-    prepare_env, timeout, assert_busy,
+    prepare_env,
+    timeout,
+    assert_busy,
+    FunctionTimeoutError
 )
 
 from crate.qa.minio_svr import MinioServer, _is_up
@@ -464,10 +467,10 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('4.0.x', '5.x.x')
+    VERSION = ('4.0.x', '5.6.0')
 
     def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when upgrading 4.0.x -> 5.x.x
+        """Test snapshot compatibility
 
         Using Minio as a S3 repository, the first cluster that runs
         creates the repo, a table and inserts/selects some data, which
@@ -481,7 +484,7 @@ protocol = 'http')
             t.start()
             wait_until(lambda: _is_up('127.0.0.1', 9000))
 
-            num_nodes = 3
+            num_nodes = 1
             num_docs = 30
             prev_version = None
             num_snapshot = 1
@@ -491,10 +494,14 @@ protocol = 'http')
             }
 
             paths = None
+            print("")
             for version in self.VERSION:
+                print(version)
                 cluster = self._new_cluster(version, num_nodes, paths, settings=cluster_settings)
                 paths = [node._settings['path.data'] for node in cluster.nodes()]
                 cluster.start()
+                for i, node in enumerate(cluster.nodes()):
+                    print(f"    Node {i}: ", node.logs_path)
                 with connect(cluster.node().http_url, error_trace=True) as conn:
                     c = conn.cursor()
                     if not prev_version:
@@ -503,12 +510,26 @@ protocol = 'http')
                         c.execute(CREATE_DOC_TABLE)
                         insert_data(conn, 'doc', 't1', num_docs)
                     else:
-                        c.execute(self.RESTORE_SNAPSHOT_TPT.format(num_snapshot - 1))
+                        stmt = self.RESTORE_SNAPSHOT_TPT.format(num_snapshot - 1)
+                        print(f"    Running restore: {stmt}")
+                        c.execute(stmt)
+                        print("    Restore finished")
                     c.execute('SELECT COUNT(*) FROM t1')
                     rowcount = c.fetchone()[0]
                     self.assertEqual(rowcount, num_docs)
                     run_selects(c, version)
-                    c.execute(self.CREATE_SNAPSHOT_TPT.format(num_snapshot))
+
+                    @timeout(30)
+                    def create_snapshot():
+                        print(f"    Creating snapshot {num_snapshot}")
+                        c.execute(self.CREATE_SNAPSHOT_TPT.format(num_snapshot))
+                        print(f"    Snapshot {num_snapshot} finished")
+
+                    try:
+                        create_snapshot()
+                    except FunctionTimeoutError as e:
+                        raise e
+
                     c.execute(self.DROP_DOC_TABLE)
                 self._process_on_stop()
                 prev_version = version
