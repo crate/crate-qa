@@ -40,7 +40,7 @@ UPGRADE_PATHS = (
         VersionDef('5.4.x', []),
         VersionDef('5.5.x', []),
         VersionDef('branch:5.6', []),
-        VersionDef('latest-nightly', [])
+        VersionDef('branch:master', [])
     ),
 )
 
@@ -464,7 +464,7 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('4.0.x', '5.x.x')
+    VERSION = ('4.0.x', 'branch:master')
 
     def test_snapshot_compatibility(self):
         """Test snapshot compatibility when upgrading 4.0.x -> 5.x.x

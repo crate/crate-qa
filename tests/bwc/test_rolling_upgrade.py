@@ -21,7 +21,7 @@ ROLLING_UPGRADES = (
     UpgradePath('5.3.x', '5.4.x'),
     UpgradePath('5.4.x', '5.5.x'),
     UpgradePath('5.5.x', 'branch:5.6'),
-    UpgradePath('branch:5.6', 'latest-nightly')
+    UpgradePath('branch:5.6', 'branch:master')
 )
 
 
