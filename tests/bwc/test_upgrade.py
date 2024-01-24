@@ -464,10 +464,10 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('4.0.x', '5.x.x')
+    VERSION = ('4.0.x', 'latest-nightly')
 
     def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when upgrading 4.0.x -> 5.x.x
+        """Test snapshot compatibility when upgrading 4.0.x -> latest-nightly
 
         Using Minio as a S3 repository, the first cluster that runs
         creates the repo, a table and inserts/selects some data, which
