@@ -27,6 +27,7 @@ ROLLING_UPGRADES = (
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
     def test_rolling_upgrade(self):
+        print("")  # force newline for first print(path)
         for path in ROLLING_UPGRADES:
             print(path)
             with self.subTest(repr(path)):
@@ -56,6 +57,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
+            c.execute("create user arthur")
+            c.execute("grant dql to arthur")
             c.execute(f'''
                 CREATE TABLE doc.t1 (
                     type BYTE,
@@ -95,6 +98,13 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()
                 wait_for_active_shards(c, expected_active_shards)
+
+                c.execute("select name from sys.users order by 1")
+                self.assertEqual(c.fetchall(), [["arthur"], ["crate"]])
+
+                c.execute("select * from sys.privileges")
+                self.assertEqual(c.fetchall(), [["CLUSTER", "arthur", "crate", None, "GRANT", "DQL"]])
+
                 c.execute('''
                     SELECT type, AVG(value)
                     FROM doc.t1
