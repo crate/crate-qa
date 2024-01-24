@@ -27,9 +27,9 @@ ROLLING_UPGRADES = (
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
     def test_rolling_upgrade(self):
-        print("")  # force newline for first print(path)
+        print("")  # force newline for first print
         for path in ROLLING_UPGRADES:
-            print(path)
+            print(f"From {path.from_version}")
             with self.subTest(repr(path)):
                 try:
                     self.setUp()
@@ -93,6 +93,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             expected_active_shards += shards
 
         for idx, node in enumerate(cluster):
+            print(f"    upgrade node {idx} to {path.to_version}")
             new_node = self.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
