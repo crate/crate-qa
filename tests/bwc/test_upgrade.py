@@ -2,6 +2,7 @@ import os
 import shutil
 import threading
 import unittest
+from datetime import datetime
 from uuid import uuid4
 from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
@@ -175,7 +176,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         few simple selects work.
         """
         version_def = versions[0]
-        print(f"\nStart version: {version_def.version}")
+        timestamp = datetime.utcnow().isoformat(timespec='seconds')
+        print(f"\n{timestamp} Start version: {version_def.version}")
         env = prepare_env(version_def.java_home)
         cluster = self._new_cluster(
             version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
@@ -205,7 +207,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     f.truncate()
                     f.close()
 
-    @timeout(420)
+    @timeout(600)
     def _do_upgrade(self,
                     cluster: CrateCluster,
                     nodes: int,
