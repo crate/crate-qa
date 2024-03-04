@@ -242,7 +242,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
         self._process_on_stop()
         for version_def in versions[1:]:
-            print(f"    Upgrade to: {version_def.version}")
+            timestamp = datetime.utcnow().isoformat(timespec='seconds')
+            print(f"{timestamp} Upgrade to:: {version_def.version}")
             self.assert_data_persistence(version_def, nodes, digest, paths)
         # restart with latest version
         version_def = versions[-1]
