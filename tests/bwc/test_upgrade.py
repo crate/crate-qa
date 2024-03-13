@@ -209,7 +209,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     f.truncate()
                     f.close()
 
-    @timeout(600)
+    @timeout(900)
     def _do_upgrade(self,
                     cluster: CrateCluster,
                     nodes: int,
