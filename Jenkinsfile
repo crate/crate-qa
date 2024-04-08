@@ -23,7 +23,9 @@ pipeline {
               python3 -m venv env
               . env/bin/activate
               python -m pip install -U cr8
-              (cd tests/client_tests/rust/ && ./run.sh)
+              cd graaldemo
+              ./mvnw -T1C clean package
+              java -jar target/demo-1-jar-with-dependencies.jar
             '''
           }
         }
