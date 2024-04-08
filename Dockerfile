@@ -7,6 +7,5 @@ RUN \
 
 ENV HOME /root
 WORKDIR /root
-USER root
 
 CMD ["bash"]
