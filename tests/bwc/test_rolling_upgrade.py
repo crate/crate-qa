@@ -96,6 +96,17 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             expected_active_shards += shards
 
         for idx, node in enumerate(cluster):
+            # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
+            # Otherwise upgraded node simply requests N-1 columns from old version with N columns and it always works.
+            # Was a regression for 5.7 <-> 5.8
+            with connect(node.http_url, error_trace=True) as old_node_conn:
+                c = old_node_conn.cursor()
+                c.execute('''
+                    SELECT * from sys.nodes
+                ''')
+                res = c.fetchall()
+                self.assertEqual(len(res), 3)
+
             print(f"    upgrade node {idx} to {path.to_version}")
             new_node = self.upgrade_node(node, path.to_version)
             cluster[idx] = new_node
