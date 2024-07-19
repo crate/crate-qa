@@ -73,7 +73,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     o object(ignored) as (a int),
                     index composite_nested_ft using fulltext(title, author['name']) with(analyzer = 'stop')
                 ) CLUSTERED INTO {shards} SHARDS
-                WITH (number_of_replicas={replicas})
+                WITH (number_of_replicas={replicas}, "warmer.enabled" = true)
             ''')
             c.execute("CREATE VIEW doc.v1 AS SELECT type, title, value FROM doc.t1")
             insert_data(conn, 'doc', 't1', 1000)
