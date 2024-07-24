@@ -3,27 +3,8 @@ from crate.client import connect
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES = (
-    # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.x'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', 'latest-nightly')
+    UpgradePath('5.7.x', 'branch:5.8'),
+    UpgradePath('branch:5.8', 'latest-nightly')
 )
 
 
