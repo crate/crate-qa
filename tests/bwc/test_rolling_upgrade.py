@@ -61,7 +61,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
-            c.execute("create user arthur")
+            c.execute("create user arthur with (password = 'secret')")
             c.execute("grant dql to arthur")
             c.execute(f'''
                 CREATE TABLE doc.t1 (
@@ -110,6 +110,13 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
             print(f"    upgrade node {idx} to {path.to_version}")
             new_node = self.upgrade_node(node, path.to_version)
+
+            # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
+            with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
+                c = custom_user_conn.cursor()
+                wait_for_active_shards(c, expected_active_shards)
+                c.execute("SELECT 1")
+
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
                 c = conn.cursor()
