@@ -29,7 +29,7 @@ setup(
     package_dir={'': 'src'},
     packages=['crate.qa'],
     install_requires=[
-        'crate',
+        'crate>=1.0.0.dev2',
         'cr8>=0.25.0',
         'Cython',
         'asyncpg>=0.21',
