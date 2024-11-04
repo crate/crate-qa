@@ -211,7 +211,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     f.truncate()
                     f.close()
 
-    @timeout(900)
+    @timeout(1200)
     def _do_upgrade(self,
                     cluster: CrateCluster,
                     nodes: int,
@@ -246,7 +246,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         self._process_on_stop()
         for version_def in versions[1:]:
             timestamp = datetime.utcnow().isoformat(timespec='seconds')
-            print(f"{timestamp} Upgrade to:: {version_def.version}")
+            print(f"{timestamp} Upgrade to: {version_def.version}")
             self.assert_data_persistence(version_def, nodes, digest, paths)
         # restart with latest version
         version_def = versions[-1]
@@ -265,6 +265,11 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             assert_busy(lambda: self.assert_nodes(conn, nodes))
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
+            version = version_def.version.replace(".", "_")
+            cursor.execute(CREATE_DOC_TABLE.replace(
+                "CREATE TABLE t1 (",
+                f'CREATE TABLE IF NOT EXISTS versioned."t{version}" ('
+            ))
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
             run_selects(cursor, version_def.version)
             container = conn.get_blob_container('b1')
@@ -276,6 +281,12 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
             cursor.execute("select * from sys.privileges")
             self.assertEqual(cursor.fetchall(), [["TABLE", "trillian", "crate", "doc.t1", "GRANT", "DQL"]])
+
+            cursor.execute("select table_name from information_schema.tables where table_schema = 'versioned'")
+            tables = [row[0] for row in cursor.fetchall()]
+            for table in tables:
+                cursor.execute(f'select * from versioned."{table}"')
+                cursor.execute(f'insert into versioned."{table}" (id, col_int) values (?, ?)', [str(uuid4()), 1])
 
             # older versions had a bug that caused this to fail
             if version in ('latest-nightly', '3.2'):
