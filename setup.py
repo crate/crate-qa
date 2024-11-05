@@ -28,7 +28,6 @@ setup(
     },
     package_dir={'': 'src'},
     packages=['crate.qa'],
-    namespace_packages=['crate'],
     install_requires=[
         'crate',
         'cr8>=0.25.0',
