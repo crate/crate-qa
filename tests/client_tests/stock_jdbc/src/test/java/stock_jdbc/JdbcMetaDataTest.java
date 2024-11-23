@@ -246,7 +246,8 @@ public class JdbcMetaDataTest {
     }
 
     @Test
-    @Ignore("Blocked by https://github.com/crate/crate/issues/5463")
+    @Ignore("Blocked by https://github.com/crate/crate/issues/17049")
+    // Error: Unknown function: pg_catalog.pg_get_indexdef(tmp.ci_oid, tmp.ordinal_position, false)")
     public void test_getIndexInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var results = conn.getMetaData().getIndexInfo("", "sys", "summits", true, true);
@@ -1237,5 +1238,3 @@ public class JdbcMetaDataTest {
         }
     }
 }
-
-
