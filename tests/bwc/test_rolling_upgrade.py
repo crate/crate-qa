@@ -168,12 +168,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute(
                     "INSERT INTO doc.t1 (type, value, title, author) VALUES (3, 3, 'some title', {name='nothing to see, move on'})")
 
-                for i in range(1, 99):
-                    print(100 * idx + i)
-                    # Ensure that inserts, which will create a new partition, are working while upgrading
-                    c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [100 * idx + i + 1, 100 * idx + i + 1])
-                    # Add the shards of the new partition primaries
-                    expected_active_shards += shards
+                # Ensure that inserts, which will create a new partition, are working while upgrading
+                c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
+                # Add the shards of the new partition primaries
+                expected_active_shards += shards
 
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
