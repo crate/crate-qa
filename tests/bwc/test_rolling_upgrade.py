@@ -4,7 +4,7 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('5.7.x', '5.8.x'),
+    UpgradePath('5.7.5', '5.8.5'),
 )
 
 
@@ -77,6 +77,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             expected_active_shards += shards
 
 #             c.execute('ALTER TABLE doc.parted RESET ("warmer.enabled")')
+
+            c.execute('''
+                SELECT version['created'], version['upgraded'] FROM information_schema.tables
+                WHERE table_name = 'parted'
+            ''')
+            res = c.fetchall()
+            self.assertEqual(res[0][0], '5.7.5')
+            self.assertEqual(res[0][1], None)
 
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
