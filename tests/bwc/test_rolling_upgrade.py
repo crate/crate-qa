@@ -181,6 +181,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
 
+                c.execute('''
+                    SELECT version['created'], version['upgraded'] FROM information_schema.tables
+                    WHERE table_name = 'parted'
+                ''')
+                res = c.fetchall()
+                self.assertEqual(res[0][0], '5.7.5')
+                self.assertEqual(res[0][1], '5.8.5')
+
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
