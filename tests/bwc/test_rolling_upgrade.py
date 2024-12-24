@@ -76,7 +76,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Add the shards of the new partition primaries
             expected_active_shards += shards
 
-#             c.execute('ALTER TABLE doc.parted RESET ("warmer.enabled")')
+            c.execute('ALTER TABLE doc.parted RESET ("warmer.enabled")')
 
             c.execute('''
                 SELECT version['created'], version['upgraded'] FROM information_schema.tables
