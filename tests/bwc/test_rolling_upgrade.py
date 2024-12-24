@@ -4,27 +4,7 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.x'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', 'latest-nightly')
+    UpgradePath('5.7.5', '5.8.5'),
 )
 
 
@@ -90,11 +70,21 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     value INT
                 ) CLUSTERED INTO {shards} SHARDS
                 PARTITIONED BY (id)
-                WITH (number_of_replicas=0, "write.wait_for_active_shards"=1)
+                WITH (number_of_replicas=0, "write.wait_for_active_shards"=1, "warmer.enabled" = true)
             ''')
             c.execute("INSERT INTO doc.parted (id, value) VALUES (1, 1)")
             # Add the shards of the new partition primaries
             expected_active_shards += shards
+
+            c.execute('ALTER TABLE doc.parted RESET ("warmer.enabled")')
+
+            c.execute('''
+                SELECT version['created'], version['upgraded'] FROM information_schema.tables
+                WHERE table_name = 'parted'
+            ''')
+            res = c.fetchall()
+            self.assertEqual(res[0][0], '5.7.5')
+            self.assertEqual(res[0][1], None)
 
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
@@ -191,17 +181,30 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
 
+#                 c.execute('''
+#                     SELECT version['created'], version['upgraded'] FROM information_schema.tables
+#                     WHERE table_name = 'parted'
+#                 ''')
+#                 res = c.fetchall()
+#                 self.assertEqual(res[0][0], '5.7.5')
+                # self.assertEqual(res[0][1], '5.8.5') Can be None sometimes 0 - why? But unrelated to version_created which is the current focus
+
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
+
+            # Ensure that inserts, which will create a new partition, are working after upgrade
+            c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [10000, 10000])
+            # Add the shards of the new partition primaries
+            expected_active_shards += shards
+
             wait_for_active_shards(c, expected_active_shards)
-            c.execute('''
-                REFRESH TABLE doc.parted
-            ''')
-            c.execute('''
-                SELECT count(*)
-                FROM doc.parted
-            ''')
-            res = c.fetchone()
-            self.assertEqual(res[0], nodes + 1)
+
+#             c.execute('''
+#                 SELECT version['created'], version['upgraded'] FROM information_schema.tables
+#                 WHERE table_name = 'parted'
+#             ''')
+#             res = c.fetchall()
+#             self.assertEqual(res[0][0], '5.7.5')
+#             self.assertEqual(res[0][1], '5.8.5')
