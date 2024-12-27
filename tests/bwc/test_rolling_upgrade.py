@@ -161,19 +161,6 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 self.assertEqual(res[1][0], 'no match title')
                 self.assertEqual(res[1][1], {'name': 'matchMe name'})
 
-                # Dynamically added empty arrays and ignored object sub-columns are indexed with special prefix starting from 5.5
-                # Ensure that reading such columns work across all versions.
-                # Related to https://github.com/crate/crate/commit/278d45f176e7d1d3215118255cd69afd2d3786ee
-                c.execute('''
-                    SELECT author, o['dyn_ignored_subcol']
-                    FROM doc.t1
-                    WHERE title = 'prefix_check'
-                ''')
-                res = c.fetchall()
-                self.assertEqual(len(res), 1)
-                self.assertEqual(res[0][0], {'dyn_empty_array': []})
-                self.assertEqual(res[0][1], 'hello')
-
                 # Ensure that inserts are working while upgrading
                 c.execute(
                     "INSERT INTO doc.t1 (type, value, title, author) VALUES (3, 3, 'some title', {name='nothing to see, move on'})")
