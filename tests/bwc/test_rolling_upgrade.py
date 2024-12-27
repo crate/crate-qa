@@ -4,7 +4,7 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 
 ROLLING_UPGRADES = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('5.7.5', '5.8.5'),
+    UpgradePath('5.7.5', 'branch:b/create-partition-fix'),
 )
 
 
