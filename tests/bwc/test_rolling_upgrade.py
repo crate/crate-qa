@@ -205,3 +205,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             ''')
             res = c.fetchone()
             self.assertEqual(res[0], nodes + 1)
+
+            c.execute('''
+                SELECT version['upgraded'] FROM information_schema.tables
+                WHERE table_name = 't1'
+            ''')
+            res = c.fetchall()
+            self.assertEqual(res[0][0], path.to_version)
