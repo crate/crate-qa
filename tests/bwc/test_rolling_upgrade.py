@@ -64,6 +64,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
             c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
 
+            c.execute("REFRESH TABLE doc.t1")
+
             c.execute(f'''
                 CREATE TABLE doc.parted (
                     id INT,
