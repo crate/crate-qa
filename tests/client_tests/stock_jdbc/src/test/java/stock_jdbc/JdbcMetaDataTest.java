@@ -143,7 +143,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getColumns("", "sys", "summits", "");
+            var results = conn.getMetaData().getColumns("", "sys", "summits", null);
             assertThat(results.next()).isTrue();
             assertThat(results.getString(3)).isEqualTo("summits");
             assertThat(results.getString(4)).isEqualTo("classification");
@@ -221,7 +221,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getFunctions() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getFunctions("", "", "current_schema");
+            var results = conn.getMetaData().getFunctions(null, null, "current_schema");
             assertThat(results.next()).isTrue();
         }
     }
@@ -544,7 +544,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getTables() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getTables(null, "sys", "", null);
+            var results = conn.getMetaData().getTables(null, "sys", null, null);
             assertThat(results.next()).isTrue();
             assertThat(results.getString(3)).isEqualTo("allocations_pkey");
         }
