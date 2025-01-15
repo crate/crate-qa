@@ -1,7 +1,7 @@
 package stock_jdbc;
 
 import io.crate.testing.CrateTestCluster;
-import org.junit.After;
+import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,8 +22,8 @@ public class JdbcTest {
         .build();
     public static final String URL = "jdbc:postgresql://localhost:55433/doc?user=crate";
 
-    @After
-    public void after() throws Exception {
+    @Before
+    public void before() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
             var tables = conn.getMetaData().getTables(null, "doc", null, null);
             while (tables.next()) {
