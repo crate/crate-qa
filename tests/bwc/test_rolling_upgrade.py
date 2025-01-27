@@ -24,7 +24,8 @@ ROLLING_UPGRADES = (
     UpgradePath('5.6.x', '5.7.x'),
     UpgradePath('5.7.x', '5.8.x'),
     UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', 'latest-nightly')
+    UpgradePath('5.9.x', '5.10.x')
+    # TODO: Add upgrade path from 5.10.x to 6.x once the version compatibility issues are fixed
 )
 
 

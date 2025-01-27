@@ -44,8 +44,22 @@ UPGRADE_PATHS = (
         VersionDef('5.7.x', []),
         VersionDef('5.8.x', []),
         VersionDef('5.9.x', []),
-        VersionDef('latest-nightly', [])
+        VersionDef('5.10.x', []),
     ),
+    (
+        VersionDef('5.0.x', []),
+        VersionDef('5.1.x', []),
+        VersionDef('5.2.x', []),
+        VersionDef('5.3.x', []),
+        VersionDef('5.4.x', []),
+        VersionDef('5.5.x', []),
+        VersionDef('5.6.x', []),
+        VersionDef('5.7.x', []),
+        VersionDef('5.8.x', []),
+        VersionDef('5.9.x', []),
+        VersionDef('5.10.x', []),
+        VersionDef('latest-nightly', [])
+    )
 )
 
 CREATE_PARTED_TABLE = '''
@@ -482,10 +496,10 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('4.0.x', 'latest-nightly')
+    VERSION = ('5.0.x', 'latest-nightly')
 
     def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when upgrading 4.0.x -> latest-nightly
+        """Test snapshot compatibility when upgrading 5.0.x -> latest-nightly
 
         Using Minio as a S3 repository, the first cluster that runs
         creates the repo, a table and inserts/selects some data, which
