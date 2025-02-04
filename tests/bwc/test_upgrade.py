@@ -58,7 +58,7 @@ UPGRADE_PATHS = (
         VersionDef('5.8.x', []),
         VersionDef('5.9.x', []),
         VersionDef('5.10.x', []),
-        VersionDef('branch:b/fix-blob', [])
+        VersionDef('branch:master', [])
     )
 )
 
@@ -280,6 +280,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
             version = version_def.version.replace(".", "_")
+            if version == 'tbranch:master':
+                version = 'branch'
             cursor.execute(CREATE_DOC_TABLE.replace(
                 "CREATE TABLE t1 (",
                 f'CREATE TABLE IF NOT EXISTS versioned."t{version}" ('
