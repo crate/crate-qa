@@ -2,7 +2,7 @@ import unittest
 from crate.client import connect
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
-ROLLING_UPGRADES = (
+ROLLING_UPGRADES_V4 = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
     UpgradePath('4.0.2', '4.0.x'),
     UpgradePath('4.0.x', '4.1.0'),
@@ -24,16 +24,42 @@ ROLLING_UPGRADES = (
     UpgradePath('5.6.x', '5.7.x'),
     UpgradePath('5.7.x', '5.8.x'),
     UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x')
-    # TODO: Add upgrade path from 5.10.x to 6.x once the version compatibility issues are fixed
+    # TODO: Use 5.10.x (latest tag) instead of 5.10 branch once 5.10.1 is released
+    UpgradePath('5.9.x', '5.10')
+)
+
+ROLLING_UPGRADES_V5 = (
+    UpgradePath('5.0.x', '5.1.x'),
+    UpgradePath('5.1.x', '5.2.x'),
+    UpgradePath('5.2.x', '5.3.x'),
+    UpgradePath('5.3.x', '5.4.x'),
+    UpgradePath('5.4.x', '5.5.x'),
+    UpgradePath('5.5.x', '5.6.x'),
+    UpgradePath('5.6.x', '5.7.x'),
+    UpgradePath('5.7.x', '5.8.x'),
+    UpgradePath('5.8.x', '5.9.x'),
+    # TODO: Use 5.10.x (latest tag) instead of 5.10 branch once 5.10.1 is released
+    UpgradePath('5.9.x', '5.10'),
+    UpgradePath('5.10', 'latest-nightly')
 )
 
 
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
-    def test_rolling_upgrade(self):
+    def test_rolling_upgrade_4_to_5(self):
         print("")  # force newline for first print
-        for path in ROLLING_UPGRADES:
+        for path in ROLLING_UPGRADES_V4:
+            print(f"From {path.from_version}")
+            with self.subTest(repr(path)):
+                try:
+                    self.setUp()
+                    self._test_rolling_upgrade(path, nodes=3)
+                finally:
+                    self.tearDown()
+
+    def test_rolling_upgrade_5_to_6(self):
+        print("")  # force newline for first print
+        for path in ROLLING_UPGRADES_V5:
             print(f"From {path.from_version}")
             with self.subTest(repr(path)):
                 try:
