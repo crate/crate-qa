@@ -25,7 +25,7 @@ ROLLING_UPGRADES_V4 = (
     UpgradePath('5.7.x', '5.8.x'),
     UpgradePath('5.8.x', '5.9.x'),
     # TODO: Use 5.10.x (latest tag) instead of 5.10 branch once 5.10.1 is released
-    UpgradePath('5.9.x', '5.10')
+    UpgradePath('5.9.x', '5.10.0')
 )
 
 ROLLING_UPGRADES_V5 = (
