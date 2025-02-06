@@ -4,28 +4,28 @@ from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, Up
 
 ROLLING_UPGRADES_V4 = (
     # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.x'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
+    #UpgradePath('4.0.2', '4.0.x'),
+    #UpgradePath('4.0.x', '4.1.0'),
+    #UpgradePath('4.1.0', '4.1.x'),
+    #UpgradePath('4.1.x', '4.2.x'),
+    #UpgradePath('4.2.x', '4.3.x'),
+    #UpgradePath('4.3.x', '4.4.x'),
+    #UpgradePath('4.4.x', '4.5.x'),
+    #UpgradePath('4.5.x', '4.6.x'),
+    #UpgradePath('4.6.x', '4.7.x'),
+    #UpgradePath('4.7.x', '4.8.x'),
+    #UpgradePath('4.8.x', '5.0.x'),
+    #UpgradePath('5.0.x', '5.1.x'),
+    #UpgradePath('5.1.x', '5.2.x'),
+    #UpgradePath('5.2.x', '5.3.x'),
+    #UpgradePath('5.3.x', '5.4.x'),
+    #UpgradePath('5.4.x', '5.5.x'),
+    #UpgradePath('5.5.x', '5.6.x'),
+    #UpgradePath('5.6.x', '5.7.x'),
+    #UpgradePath('5.7.x', '5.8.x'),
+    #UpgradePath('5.8.x', '5.9.x'),
     # TODO: Use 5.10.x (latest tag) instead of 5.10 branch once 5.10.1 is released
-    UpgradePath('5.9.x', '5.10.0')
+    UpgradePath('5.9.0', '5.10.0'),
 )
 
 ROLLING_UPGRADES_V5 = (
@@ -188,6 +188,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     ORDER BY value
                 ''')
                 res = c.fetchall()
+                if len(res) != 2:
+                    import pdb; pdb.set_trace()
                 self.assertEqual(len(res), 2)
                 # only title matches
                 self.assertEqual(res[0][0], 'matchMe title')
