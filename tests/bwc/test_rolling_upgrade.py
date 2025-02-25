@@ -81,7 +81,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         expected_active_shards = shards + shards * replicas
 
         settings = {
-            "transport.netty.worker_count": 16
+            "transport.netty.worker_count": 16,
+            'lang.js.enabled': 'true'
         }
         cluster = self._new_cluster(path.from_version, nodes, settings=settings)
         cluster.start()
@@ -110,10 +111,17 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
             c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
 
+            c.execute('''
+                CREATE FUNCTION foo(INT)
+                RETURNS INT
+                LANGUAGE JAVASCRIPT
+                AS 'function foo(a) { return a + 1 }';
+            ''')
             c.execute(f'''
                 CREATE TABLE doc.parted (
                     id INT,
-                    value INT
+                    value INT,
+                    f_value GENERATED ALWAYS AS foo(value)
                 ) CLUSTERED INTO {shards} SHARDS
                 PARTITIONED BY (id)
                 WITH (number_of_replicas=0, "write.wait_for_active_shards"=1)
