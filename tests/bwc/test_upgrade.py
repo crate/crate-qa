@@ -258,20 +258,22 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
             self.assertIsNotNone(container.get(digest))
 
+        accumulated_dynamic_column_names: list[str] = []
         self._process_on_stop()
         for version_def in versions[1:]:
             timestamp = datetime.utcnow().isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
-            self.assert_data_persistence(version_def, nodes, digest, paths)
+            self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
         # restart with latest version
         version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest, paths)
+        self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
 
     def assert_data_persistence(self,
                                 version_def: VersionDef,
                                 nodes: int,
                                 digest: str,
-                                paths: Iterable[str]):
+                                paths: Iterable[str],
+                                accumulated_dynamic_column_names: list[str]):
         env = prepare_env(version_def.java_home)
         version = version_def.version
         cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
@@ -303,15 +305,26 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                 cursor.execute(f'select * from versioned."{table}"')
                 cursor.execute(f'insert into versioned."{table}" (id, col_int) values (?, ?)', [str(uuid4()), 1])
 
+            # to trigger `alter` stmt bug(https://github.com/crate/crate/pull/17178) that falsely updated the table's
+            # version created setting that resulted in oids instead of column names in resultsets
+            cursor.execute('ALTER TABLE doc.parted SET ("refresh_interval" = 900)')
+
             # older versions had a bug that caused this to fail
-            if version in ('latest-nightly', '3.2'):
-                # Test that partition and dynamic columns can be created
-                obj = {"t_" + version.replace('.', '_'): True}
-                args = (str(uuid4()), version, obj)
-                cursor.execute(
-                    'INSERT INTO doc.parted (id, version, cols) values (?, ?, ?)',
-                    args
-                )
+            # Test that partition and dynamic columns can be created
+            key = "t_" + version.replace('.', '_')
+            obj = {key: True}
+            args = (str(uuid4()), version, obj)
+            cursor.execute(
+                'INSERT INTO doc.parted (id, version, cols) VALUES (?, ?, ?)',
+                args
+            )
+            cursor.execute('REFRESH TABLE doc.parted')
+            accumulated_dynamic_column_names.append(key)
+            cursor.execute('SELECT cols FROM doc.parted')
+            result = cursor.fetchall()
+            for row in result:
+                for name in row[0].keys():
+                    self.assertIn(name, accumulated_dynamic_column_names)
         self._process_on_stop()
 
     def assert_green(self, conn: Connection, schema: str, table_name: str):
