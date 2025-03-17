@@ -180,7 +180,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     def test_upgrade_paths(self):
-        for path in [(VersionDef(version='5.4.x', java_home=[]), VersionDef(version='5.7.x', java_home=[]), VersionDef(version='5.9', java_home=[]))]:
+        for path in get_test_paths():
             try:
                 self.setUp()
                 self._test_upgrade_path(path, nodes=3)
