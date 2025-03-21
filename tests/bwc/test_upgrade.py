@@ -315,14 +315,18 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             obj = {key: True}
             args = (str(uuid4()), version, obj)
             cursor.execute(
-                'INSERT INTO doc.parted (id, version, cols) values (?, ?, ?)',
+                'INSERT INTO doc.parted (id, version, cols) VALUES (?, ?, ?)',
                 args
             )
+            cursor.execute('REFRESH TABLE doc.parted')
             accumulated_dynamic_column_names.append(key)
-            cursor.execute('SELECT cols from doc.parted')
+            cursor.execute('SELECT cols FROM doc.parted')
             result = cursor.fetchall()
             for row in result:
-                if row[0] is not None:
+                if row[0] is None:
+                    cursor.execute('SELECT * FROM doc.parted where col is null')
+                    assert False, cursor.fetchall()
+                else:
                     for name in row[0].keys():
                         self.assertIn(name, accumulated_dynamic_column_names)
         self._process_on_stop()
