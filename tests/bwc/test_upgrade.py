@@ -59,7 +59,7 @@ UPGRADE_PATHS = (
         VersionDef('5.9.x', []),
         VersionDef('5.10.x', []),
         VersionDef('5.10', []),
-        VersionDef('latest-nightly', [])
+        VersionDef('branch:master', [])
     )
 )
 
@@ -510,7 +510,7 @@ protocol = 'http')
 
     DROP_DOC_TABLE = 'DROP TABLE t1'
 
-    VERSION = ('5.0.x', 'latest-nightly')
+    VERSION = ('5.0.x', 'branch:master')
 
     def test_snapshot_compatibility(self):
         """Test snapshot compatibility when upgrading 5.0.x -> latest-nightly
