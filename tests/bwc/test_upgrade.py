@@ -71,6 +71,11 @@ CREATE TABLE parted (
 ) PARTITIONED BY (version) CLUSTERED INTO 1 SHARDS
 '''
 
+CREATE_DYNAMIC_TABLE = '''
+CREATE TABLE dynamic (
+    o object
+) WITH (column_policy = 'dynamic')
+'''
 
 CREATE_DOC_TABLE = '''
 CREATE TABLE t1 (
@@ -240,6 +245,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             c.execute(CREATE_ANALYZER)
             c.execute(CREATE_DOC_TABLE)
             c.execute(CREATE_PARTED_TABLE)
+            c.execute(CREATE_DYNAMIC_TABLE)
 
             c.execute("DROP USER IF EXISTS trillian")
             c.execute("CREATE USER trillian")
@@ -258,20 +264,22 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
             self.assertIsNotNone(container.get(digest))
 
+        accumulated_dynamic_column_names: list[str] = []
         self._process_on_stop()
         for version_def in versions[1:]:
             timestamp = datetime.utcnow().isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
-            self.assert_data_persistence(version_def, nodes, digest, paths)
+            self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
         # restart with latest version
         version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest, paths)
+        self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
 
     def assert_data_persistence(self,
                                 version_def: VersionDef,
                                 nodes: int,
                                 digest: str,
-                                paths: Iterable[str]):
+                                paths: Iterable[str],
+                                accumulated_dynamic_column_names: list[str]):
         env = prepare_env(version_def.java_home)
         version = version_def.version
         cluster = self._new_cluster(version, nodes, data_paths=paths, settings=self.CLUSTER_SETTINGS, env=env)
@@ -302,6 +310,18 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             for table in tables:
                 cursor.execute(f'select * from versioned."{table}"')
                 cursor.execute(f'insert into versioned."{table}" (id, col_int) values (?, ?)', [str(uuid4()), 1])
+
+            # to trigger `alter` stmt bug(https://github.com/crate/crate/pull/17178) that falsely updated the table's
+            # version created setting that resulted in oids instead of column names in resultsets
+            cursor.execute('ALTER TABLE doc.dynamic SET ("refresh_interval" = 900)')
+            cursor.execute('INSERT INTO doc.dynamic (o) values (?)', [{version: True}])
+            cursor.execute('REFRESH TABLE doc.dynamic')
+            accumulated_dynamic_column_names.append(version)
+            cursor.execute('SELECT o FROM doc.dynamic')
+            result = cursor.fetchall()
+            for row in result:
+                for name in row[0].keys():
+                    self.assertIn(name, accumulated_dynamic_column_names)
 
             # older versions had a bug that caused this to fail
             if version in ('latest-nightly', '3.2'):
