@@ -1,5 +1,7 @@
 import unittest
 from crate.client import connect
+from crate.client.exceptions import ProgrammingError
+
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES_V4 = (
@@ -103,13 +105,33 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 ) CLUSTERED INTO {shards} SHARDS
                 WITH (number_of_replicas={replicas})
             ''')
+            c.execute("deny dql on table doc.t1 to arthur")
             c.execute("CREATE VIEW doc.v1 AS SELECT type, title, value FROM doc.t1")
             insert_data(conn, 'doc', 't1', 1000)
-
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (1, 1, 'matchMe title', {name='no match name'})")
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (2, 2, 'no match title', {name='matchMe name'})")
-
             c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
+
+            if int(path.from_version.split('.')[0]) >= 5:
+                c.execute('''
+                    create table doc.t2 (
+                        a int primary key,
+                        b int not null,
+                        c int default (random() + 1),
+                        d generated always as (a + b + c),
+                        constraint d CHECK (d > a + b)
+                    ) clustered into 1 shards with (number_of_replicas = 0)
+                ''')
+                expected_active_shards += 1
+                c.execute('''
+                    create table doc.t3 (
+                        a int primary key,
+                        b int not null,
+                        c int default (random() + 1),
+                        d generated always as (a + b + c),
+                        constraint d CHECK (d > a + b)
+                    ) partitioned by (a) clustered into 1 shards with (number_of_replicas = 0)
+                ''')
 
             c.execute('''
                 CREATE FUNCTION foo(INT)
@@ -148,8 +170,13 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
                 c = custom_user_conn.cursor()
-                wait_for_active_shards(c, expected_active_shards)
+                wait_for_active_shards(c)
                 c.execute("SELECT 1")
+                # has no privilege
+                with self.assertRaises(ProgrammingError):
+                    c.execute("EXPLAIN SELECT * FROM doc.t1")
+                # has privilege
+                c.execute("EXPLAIN SELECT * FROM doc.v1")
 
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
@@ -159,8 +186,11 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute("select name from sys.users order by 1")
                 self.assertEqual(c.fetchall(), [["arthur"], ["crate"]])
 
-                c.execute("select * from sys.privileges")
-                self.assertEqual(c.fetchall(), [["CLUSTER", "arthur", "crate", None, "GRANT", "DQL"]])
+                c.execute("select * from sys.privileges order by ident")
+                self.assertEqual(
+                    c.fetchall(),
+                    [['TABLE', 'arthur', 'crate', 'doc.t1', 'DENY', 'DQL'],
+                     ['CLUSTER', 'arthur', 'crate', None, 'GRANT', 'DQL']])
 
                 c.execute('''
                     SELECT type, AVG(value)
@@ -225,6 +255,33 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
 
+                # Ensure table/partition versions created are correct
+                if int(path.from_version.split('.')[0]) >= 5:
+                    c.execute("insert into doc.t2(a, b) values (?, ?)", [idx, idx])
+                    c.execute("refresh table t2")
+                    c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t2 where a = ?", [idx])
+                    self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
+                    old_version = '.'.join(map(str, node.version))
+                    c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't2'")
+                    self.assertEqual(c.fetchall(), [[old_version]])
+                    # There was a behavior change in 5.9. After fully upgrading all nodes in the cluster, newly added
+                    # partitions' version created will follow the upgraded version.
+                    # E.g., when 5.9 -> 5.10 is completed, the version created for new partitions will be 5.10
+                    if int(path.from_version.split('.')[1]) >= 9:
+                        c.execute("insert into doc.t3(a, b) values (?, ?)", [idx, idx])
+                        expected_active_shards += 1
+                        c.execute("refresh table t3")
+                        c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t3 where a = ?", [idx])
+                        self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
+                        c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't3'")
+                        self.assertEqual(c.fetchall(), [[old_version]])
+                        partition_version = old_version
+                        if idx == nodes - 1:
+                            # the partition added after all nodes are upgraded should follow the upgraded(latest) version
+                            partition_version = '.'.join(map(str, new_node.version))
+                        c.execute("select version['created'] from information_schema.table_partitions where table_name = 't3' and values['a'] = ?", [idx])
+                        self.assertEqual(c.fetchall(), [[partition_version]])
+
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -239,3 +296,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             ''')
             res = c.fetchone()
             self.assertEqual(res[0], nodes + 1)
+
+            # Ensure Arthur can be dropped and re-added
+            c.execute("drop user arthur")
+            c.execute("select * from sys.privileges")
+            self.assertEqual(c.fetchall(), [])
+
+            # Ensure view 'v' can be dropped and re-added
+            c.execute("DROP VIEW doc.v1")
+            c.execute("CREATE VIEW doc.v1 AS SELECT 11")
+            c.execute("SELECT * FROM doc.v1")
+            self.assertEqual(c.fetchall(), [[11]])
