@@ -1,5 +1,7 @@
 import unittest
 from crate.client import connect
+from crate.client.exceptions import ProgrammingError
+
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath
 
 ROLLING_UPGRADES_V4 = (
@@ -103,6 +105,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 ) CLUSTERED INTO {shards} SHARDS
                 WITH (number_of_replicas={replicas})
             ''')
+            c.execute("deny dql on table doc.t1 to arthur")
             c.execute("CREATE VIEW doc.v1 AS SELECT type, title, value FROM doc.t1")
             insert_data(conn, 'doc', 't1', 1000)
 
@@ -148,8 +151,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
                 c = custom_user_conn.cursor()
-                wait_for_active_shards(c, expected_active_shards)
+                # 'arthur' can only see 'parted' shards, 6 shards are for 't1'
+                wait_for_active_shards(c, expected_active_shards - 6)
                 c.execute("SELECT 1")
+                # has no privilege
+                with self.assertRaisesRegex(ProgrammingError, "RelationUnknown.*"):
+                    c.execute("EXPLAIN SELECT * FROM doc.t1")
+                # has privilege
+                c.execute("EXPLAIN SELECT * FROM doc.v1")
 
             cluster[idx] = new_node
             with connect(new_node.http_url, error_trace=True) as conn:
@@ -159,8 +168,11 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute("select name from sys.users order by 1")
                 self.assertEqual(c.fetchall(), [["arthur"], ["crate"]])
 
-                c.execute("select * from sys.privileges")
-                self.assertEqual(c.fetchall(), [["CLUSTER", "arthur", "crate", None, "GRANT", "DQL"]])
+                c.execute("select * from sys.privileges order by ident")
+                self.assertEqual(
+                    c.fetchall(),
+                    [['TABLE', 'arthur', 'crate', 'doc.t1', 'DENY', 'DQL'],
+                     ['CLUSTER', 'arthur', 'crate', None, 'GRANT', 'DQL']])
 
                 c.execute('''
                     SELECT type, AVG(value)
@@ -239,3 +251,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             ''')
             res = c.fetchone()
             self.assertEqual(res[0], nodes + 1)
+
+            # Ensure Arthur can be dropped and re-added
+            c.execute("drop user arthur")
+            c.execute("select * from sys.privileges")
+            self.assertEqual(c.fetchall(), [])
+
+            # Ensure view 'v' can be dropped and re-added
+            c.execute("DROP VIEW doc.v1")
+            c.execute("CREATE VIEW doc.v1 AS SELECT 11")
+            c.execute("SELECT * FROM doc.v1")
+            self.assertEqual(c.fetchall(), [[11]])
