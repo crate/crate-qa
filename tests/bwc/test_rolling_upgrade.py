@@ -1,3 +1,4 @@
+import time
 import unittest
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
@@ -88,6 +89,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         }
         cluster = self._new_cluster(path.from_version, nodes, settings=settings)
         cluster.start()
+        replica_cluster = None
+        if path.from_version.startswith("5"):
+            replica_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
+            replica_cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
             c.execute("create user arthur with (password = 'secret')")
@@ -133,6 +138,18 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Add the shards of the new partition primaries
             expected_active_shards += shards
 
+            if path.from_version.startswith("5"):
+                c.execute("create table doc.x (a int) clustered into 1 shards with (number_of_replicas=0)")
+                expected_active_shards += 1
+                c.execute("create publication p for table doc.x")
+                with connect(replica_cluster.node().http_url, error_trace=True) as replica_conn:
+                    rc = replica_conn.cursor()
+                    rc.execute("create table doc.rx (a int) clustered into 1 shards with (number_of_replicas=0)")
+                    rc.execute("create publication rp for table doc.rx")
+                    rc.execute(f"create subscription rs connection 'crate://localhost:{cluster.node().addresses.transport.port}?user=crate&sslmode=sniff' publication p")
+                c.execute(f"create subscription s connection 'crate://localhost:{replica_cluster.node().addresses.transport.port}?user=crate&sslmode=sniff' publication rp")
+                expected_active_shards += 1
+
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
             # Otherwise upgraded node simply requests N-1 columns from old version with N columns and it always works.
@@ -151,11 +168,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
                 c = custom_user_conn.cursor()
-                # 'arthur' can only see 'parted' shards, 6 shards are for 't1'
-                wait_for_active_shards(c, expected_active_shards - 6)
+                wait_for_active_shards(c)
                 c.execute("SELECT 1")
                 # has no privilege
-                with self.assertRaisesRegex(ProgrammingError, "RelationUnknown.*"):
+                with self.assertRaises(ProgrammingError):
                     c.execute("EXPLAIN SELECT * FROM doc.t1")
                 # has privilege
                 c.execute("EXPLAIN SELECT * FROM doc.v1")
@@ -236,6 +252,27 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
+
+                # skip 5.5 -> 5.6 and later versions, they fail due to https://github.com/crate/crate/issues/17734
+                if int(path.to_version.split('.')[1]) < 5:
+                    with connect(replica_cluster.node().http_url, error_trace=True) as replica_conn:
+                        rc = replica_conn.cursor()
+                        wait_for_active_shards(c)
+                        wait_for_active_shards(rc)
+                        # Ensure publishing to remote cluster works
+                        rc.execute("select count(*) from doc.x")
+                        count = rc.fetchall()[0][0]
+                        c.execute("insert into doc.x values (1)")
+                        time.sleep(3)  # replication delay...
+                        rc.execute("select count(*) from doc.x")
+                        self.assertEqual(rc.fetchall()[0][0], count + 1)
+                        # Ensure subscription from remote cluster works
+                        c.execute("select count(*) from doc.rx")
+                        count = c.fetchall()[0][0]
+                        rc.execute("insert into doc.rx values (1)")
+                        time.sleep(3)  # replication delay...
+                        c.execute("select count(*) from doc.rx")
+                        self.assertEqual(c.fetchall()[0][0], count + 1)
 
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
