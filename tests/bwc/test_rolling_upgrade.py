@@ -138,7 +138,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # Add the shards of the new partition primaries
             expected_active_shards += shards
 
-            if path.from_version.startswith("5"):
+            if int(path.from_version.split('.')[0]) >= 5:
                 c.execute("create table doc.x (a int) clustered into 1 shards with (number_of_replicas=0)")
                 expected_active_shards += 1
                 c.execute("create publication p for table doc.x")
@@ -149,6 +149,19 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     rc.execute(f"create subscription rs connection 'crate://localhost:{cluster.node().addresses.transport.port}?user=crate&sslmode=sniff' publication p")
                 c.execute(f"create subscription s connection 'crate://localhost:{replica_cluster.node().addresses.transport.port}?user=crate&sslmode=sniff' publication rp")
                 expected_active_shards += 1
+
+            # FDW: two CrateDB clusters setting up foreign data wrappers bidirectionally
+            if int(path.from_version.split('.')[0]) >= 5 and int(path.from_version.split('.')[1]) >= 7:
+                c.execute("create table doc.y (a int) clustered into 1 shards with (number_of_replicas=0)")
+                expected_active_shards += 1
+                with connect(replica_cluster.node().http_url, error_trace=True) as replica_conn:
+                    rc = replica_conn.cursor()
+                    rc.execute("create table doc.y (a int) clustered into 1 shards with (number_of_replicas=0)")
+                    rc.execute(f"CREATE SERVER source FOREIGN DATA WRAPPER jdbc OPTIONS (url 'jdbc:postgresql://localhost:{cluster.node().addresses.psql.port}/')")
+                    rc.execute("CREATE FOREIGN TABLE doc.remote_y (a int) SERVER source OPTIONS (schema_name 'doc', table_name 'y')")
+                c.execute(f"CREATE SERVER remote FOREIGN DATA WRAPPER jdbc OPTIONS (url 'jdbc:postgresql://localhost:{replica_cluster.node().addresses.psql.port}/')")
+                c.execute("CREATE FOREIGN TABLE doc.remote_y (a int) SERVER remote OPTIONS (schema_name 'doc', table_name 'y')")
+
 
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
@@ -274,6 +287,26 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                         c.execute("select count(*) from doc.rx")
                         self.assertEqual(c.fetchall()[0][0], count + 1)
 
+                if int(path.from_version.split('.')[0]) >= 5 and int(path.from_version.split('.')[1]) >= 7:
+                    with connect(replica_cluster.node().http_url, error_trace=True) as replica_conn:
+                        rc = replica_conn.cursor()
+                        wait_for_active_shards(c)
+                        wait_for_active_shards(rc)
+                        # Ensure FDW in source cluster is functional
+                        rc.execute("select count(a) from doc.remote_y")
+                        count = rc.fetchall()[0][0]
+                        c.execute("insert into doc.y values (1)")
+                        time.sleep(3)  # account for delay
+                        rc.execute("select count(a) from doc.remote_y")
+                        self.assertEqual(rc.fetchall()[0][0], count + 1)
+
+                        # Ensure FDW in remote cluster is functional
+                        c.execute("select count(a) from doc.remote_y")
+                        count = c.fetchall()[0][0]
+                        rc.execute("insert into doc.y values (1)")
+                        time.sleep(3)  # account for delay
+                        c.execute("select count(a) from doc.remote_y")
+                        self.assertEqual(c.fetchall()[0][0], count + 1)
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
