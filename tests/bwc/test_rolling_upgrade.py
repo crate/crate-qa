@@ -113,11 +113,20 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             c.execute("deny dql on table doc.t1 to arthur")
             c.execute("CREATE VIEW doc.v1 AS SELECT type, title, value FROM doc.t1")
             insert_data(conn, 'doc', 't1', 1000)
-
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (1, 1, 'matchMe title', {name='no match name'})")
             c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (2, 2, 'no match title', {name='matchMe name'})")
-
             c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
+
+            c.execute('''
+                create table doc.t2 (
+                    a int primary key,
+                    b int not null,
+                    c int default random() * 100,
+                    d generated always as (a + b + c),
+                    constraint d CHECK (d > a + b)
+                ) clustered into 1 shards with (number_of_replicas = 0)
+            ''')
+            expected_active_shards += 1
 
             c.execute('''
                 CREATE FUNCTION foo(INT)
@@ -161,7 +170,6 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     rc.execute("CREATE FOREIGN TABLE doc.remote_y (a int) SERVER source OPTIONS (schema_name 'doc', table_name 'y')")
                 c.execute(f"CREATE SERVER remote FOREIGN DATA WRAPPER jdbc OPTIONS (url 'jdbc:postgresql://localhost:{replica_cluster.node().addresses.psql.port}/')")
                 c.execute("CREATE FOREIGN TABLE doc.remote_y (a int) SERVER remote OPTIONS (schema_name 'doc', table_name 'y')")
-
 
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
@@ -265,6 +273,13 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c.execute("INSERT INTO doc.parted (id, value) VALUES (?, ?)", [idx + 10, idx + 10])
                 # Add the shards of the new partition primaries
                 expected_active_shards += shards
+
+                c.execute("select count(*) from doc.t2")
+                count = c.fetchall()[0][0]
+                c.execute(f"insert into doc.t2(a, b) values ({idx}, {idx})")
+                c.execute("refresh table t2")
+                c.execute("select count(*) from doc.t2")
+                self.assertEqual(c.fetchall()[0][0], count + 1)
 
                 # skip 5.5 -> 5.6 and later versions, they fail due to https://github.com/crate/crate/issues/17734
                 if int(path.to_version.split('.')[1]) < 5:
