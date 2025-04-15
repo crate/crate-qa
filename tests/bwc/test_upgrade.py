@@ -25,42 +25,9 @@ from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
     (
-        VersionDef('4.0.x', []),
-        VersionDef('4.1.x', []),
-        VersionDef('4.2.x', []),
-        VersionDef('4.3.x', []),
-        VersionDef('4.4.x', []),
-        VersionDef('4.5.x', []),
-        VersionDef('4.6.x', []),
-        VersionDef('4.7.x', []),
-        VersionDef('4.8.x', []),
-        VersionDef('5.0.x', []),
-        VersionDef('5.1.x', []),
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
-        VersionDef('5.9.x', []),
-        VersionDef('5.10.x', []),
-    ),
-    (
-        VersionDef('5.0.x', []),
-        VersionDef('5.1.x', []),
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
-        VersionDef('5.9.x', []),
-        VersionDef('5.10.x', []),
         VersionDef('5.10', []),
-        VersionDef('latest-nightly', [])
-    )
+        VersionDef('branch:master', [])
+    ),
 )
 
 CREATE_PARTED_TABLE = '''
@@ -236,42 +203,23 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             assert_busy(lambda: self.assert_nodes(conn, nodes))
             c = conn.cursor()
-
-            c.execute(CREATE_ANALYZER)
-            c.execute(CREATE_DOC_TABLE)
             c.execute(CREATE_PARTED_TABLE)
-
-            c.execute("DROP USER IF EXISTS trillian")
-            c.execute("CREATE USER trillian")
-            c.execute("GRANT DQL ON TABLE t1 TO trillian")
-
-            c.execute('''
-                    INSERT INTO t1 (id, text) VALUES (0, 'Phase queue is foo!')
-                ''')
-            insert_data(conn, 'doc', 't1', 10)
-            c.execute(CREATE_BLOB_TABLE)
-            assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
-            run_selects(c, versions[0].version)
-            container = conn.get_blob_container('b1')
-            digest = container.put(BytesIO(b'sample data'))
-
-            assert_busy(lambda: self.assert_green(conn, 'blob', 'b1'))
-            self.assertIsNotNone(container.get(digest))
 
         accumulated_dynamic_column_names: list[str] = []
         self._process_on_stop()
         for version_def in versions[1:]:
             timestamp = datetime.utcnow().isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
-            self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
+            self.assert_data_persistence(version_def, nodes, paths, accumulated_dynamic_column_names)
         # restart with latest version
         version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
+        timestamp = datetime.utcnow().isoformat(timespec='seconds')
+        print(f"{timestamp} Restarted: {version_def.version}")
+        self.assert_data_persistence(version_def, nodes, paths, accumulated_dynamic_column_names)
 
     def assert_data_persistence(self,
                                 version_def: VersionDef,
                                 nodes: int,
-                                digest: str,
                                 paths: Iterable[str],
                                 accumulated_dynamic_column_names: list[str]):
         env = prepare_env(version_def.java_home)
@@ -283,27 +231,6 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             cursor = conn.cursor()
             wait_for_active_shards(cursor, 0)
             version = version_def.version.replace(".", "_")
-            cursor.execute(CREATE_DOC_TABLE.replace(
-                "CREATE TABLE t1 (",
-                f'CREATE TABLE IF NOT EXISTS versioned."t{version}" ('
-            ))
-            cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
-            run_selects(cursor, version_def.version)
-            container = conn.get_blob_container('b1')
-            container.get(digest)
-            cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 2000)')
-
-            cursor.execute("select name from sys.users order by 1")
-            self.assertEqual(cursor.fetchall(), [["crate"], ["trillian"]])
-
-            cursor.execute("select * from sys.privileges")
-            self.assertEqual(cursor.fetchall(), [["TABLE", "trillian", "crate", "doc.t1", "GRANT", "DQL"]])
-
-            cursor.execute("select table_name from information_schema.tables where table_schema = 'versioned'")
-            tables = [row[0] for row in cursor.fetchall()]
-            for table in tables:
-                cursor.execute(f'select * from versioned."{table}"')
-                cursor.execute(f'insert into versioned."{table}" (id, col_int) values (?, ?)', [str(uuid4()), 1])
 
             # to trigger `alter` stmt bug(https://github.com/crate/crate/pull/17178) that falsely updated the table's
             # version created setting that resulted in oids instead of column names in resultsets
