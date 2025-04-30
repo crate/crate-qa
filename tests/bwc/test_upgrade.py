@@ -592,7 +592,7 @@ class PreOidsFetchValueTest(NodeProvider, unittest.TestCase):
             c.execute("insert into tbl (a, b, c) values ('foo3', 'bar1', 'baz1')")
 
         for idx, node in enumerate(cluster):
-            new_node = self.upgrade_node(node, '5.10.x')
+            new_node = self.upgrade_node(node, '5.10')
             cluster[idx] = new_node
 
         with connect(cluster.node().http_url, error_trace=True) as conn:
