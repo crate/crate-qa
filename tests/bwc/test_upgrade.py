@@ -566,3 +566,25 @@ protocol = 'http')
                 self._process_on_stop()
                 prev_version = version
                 num_snapshot += 1
+
+
+class ObjectDepthLimitCompatibilityTest(NodeProvider, unittest.TestCase):
+    def test_object_depth(self):
+        cluster = self._new_cluster('5.10.x', 1)
+        cluster.start()
+
+        depth = 101
+
+        node = cluster.node()
+        with connect(node.http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            c.execute("create table tbl (" + ("o object as (" * depth) + "x int" + (")" * depth) + ")")
+
+        node = self.upgrade_node(node, 'latest-nightly')
+        with connect(node.http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            c.execute("alter table tbl add column o" + "['o']" * (depth - 1) + "['y'] int")
+            c.execute("insert into tbl values (" + "{o=" * (depth - 1) + "{x=1, y=2}" + "}" * (depth - 1) + ")")
+            c.execute('REFRESH TABLE tbl')
+            c.execute("select o" + "['o']" * (depth - 1) + "from tbl")
+            self.assertEqual(c.fetchall(), [[{'x': 1, 'y': 2}]])
