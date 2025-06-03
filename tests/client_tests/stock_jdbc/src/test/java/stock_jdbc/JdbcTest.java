@@ -1,18 +1,16 @@
 package stock_jdbc;
 
-import java.sql.DriverManager;
-import java.util.Map;
-
+import io.crate.testing.CrateTestCluster;
 import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import io.crate.testing.CrateTestCluster;
+import java.sql.DriverManager;
+import java.util.Map;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(JUnit4.class)
 public class JdbcTest {
@@ -42,8 +40,8 @@ public class JdbcTest {
         try (var conn = DriverManager.getConnection(URL)) {
             var stmt = conn.createStatement();
             var hasResultSet = stmt.execute("CREATE TABLE tbl (x int, y int)");
-            assertThat(hasResultSet, is(false));
-            assertThat(stmt.getUpdateCount(), is(1));
+            assertThat(hasResultSet).isFalse();
+            assertThat(stmt.getUpdateCount()).isEqualTo(1);
 
             var insertStmt = conn.prepareStatement("INSERT INTO tbl (x, y) VALUES (?, ?)");
             insertStmt.setInt(1, 1);
@@ -53,19 +51,19 @@ public class JdbcTest {
             stmt.execute("REFRESH TABLE tbl");
 
             var results = conn.createStatement().executeQuery("SELECT x, y FROM tbl ORDER BY 1");
-            assertThat(results.next(), is(true));
-            assertThat(results.getInt(1), is(1));
-            assertThat(results.getInt(2), is(10));
-            assertThat(results.next(), is(false));
+            assertThat(results.next()).isTrue();
+            assertThat(results.getInt(1)).isEqualTo(1);
+            assertThat(results.getInt(2)).isEqualTo(10);
+            assertThat(results.next()).isFalse();
 
             stmt.execute("UPDATE tbl SET y = y + 10");
             stmt.execute("REFRESH TABLE tbl");
 
             var resultsAfterUpdate = conn.createStatement().executeQuery("SELECT x, y FROM tbl ORDER BY 1");
-            assertThat(resultsAfterUpdate.next(), is(true));
-            assertThat(resultsAfterUpdate.getInt(1), is(1));
-            assertThat(resultsAfterUpdate.getInt(2), is(20));
-            assertThat(resultsAfterUpdate.next(), is(false));
+            assertThat(resultsAfterUpdate.next()).isTrue();
+            assertThat(resultsAfterUpdate.getInt(1)).isEqualTo(1);
+            assertThat(resultsAfterUpdate.getInt(2)).isEqualTo(20);
+            assertThat(resultsAfterUpdate.next()).isFalse();
         }
     }
 
@@ -84,10 +82,10 @@ public class JdbcTest {
             stmt.execute("REFRESH TABLE tbl");
 
             var results = conn.createStatement().executeQuery("SELECT x, y FROM tbl ORDER BY 1");
-            assertThat(results.next(), is(true));
-            assertThat(results.getInt(1), is(1));
-            assertThat(results.getInt(2), is(15));
-            assertThat(results.next(), is(false));
+            assertThat(results.next()).isTrue();
+            assertThat(results.getInt(1)).isEqualTo(1);
+            assertThat(results.getInt(2)).isEqualTo(15);
+            assertThat(results.next()).isFalse();
         }
     }
 
@@ -104,14 +102,14 @@ public class JdbcTest {
                     insert.addBatch();
                 }
                 int[] results = insert.executeBatch();
-                assertThat(results.length, is(20));
+                assertThat(results.length).isEqualTo(20);
             }
 
             stmt.execute("REFRESH TABLE tbl");
 
             var results = conn.createStatement().executeQuery("SELECT count(*) FROM tbl");
-            assertThat(results.next(), is(true));
-            assertThat(results.getInt(1), is(20));
+            assertThat(results.next()).isTrue();
+            assertThat(results.getInt(1)).isEqualTo(20);
         }
 
     }
