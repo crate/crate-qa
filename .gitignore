@@ -16,3 +16,4 @@ tests/client_tests/stock_jdbc/out
 *.iws
 .gradle/
 tests/client_tests/node-postgres/node_modules
+tests/client_tests/stock_jdbc/build
