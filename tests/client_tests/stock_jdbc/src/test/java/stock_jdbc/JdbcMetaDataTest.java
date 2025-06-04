@@ -86,7 +86,7 @@ public class JdbcMetaDataTest {
     @Ignore("Not implemented in PostgreSQL JDBC")
     public void test_getAttributes() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getAttributes("", "", "", "");
+            conn.getMetaData().getAttributes(null, null, null, null);
         }
     }
 
@@ -135,7 +135,7 @@ public class JdbcMetaDataTest {
     @Ignore("https://github.com/crate/crate/issues/9568")
     public void test_getColumnPrivileges() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getColumnPrivileges("", "sys", "summits", "");
+            var results = conn.getMetaData().getColumnPrivileges(null, "sys", "summits", null);
             assertThat(results.next()).isTrue();
         }
     }
@@ -143,7 +143,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getColumns("", "sys", "summits", "");
+            var results = conn.getMetaData().getColumns(null, "sys", "summits", null);
             assertThat(results.next()).isTrue();
             assertThat(results.getString(3)).isEqualTo("summits");
             assertThat(results.getString(4)).isEqualTo("classification");
@@ -153,7 +153,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getCrossReference() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getCrossReference("", "sys", "jobs", "", "sys", "jobs_log");
+            var results = conn.getMetaData().getCrossReference(null, "sys", "jobs", null, "sys", "jobs_log");
             assertThat(results.next()).isFalse();
         }
     }
@@ -198,7 +198,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getExportedKeys() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getExportedKeys("", "sys", "summits");
+            var results = conn.getMetaData().getExportedKeys(null, "sys", "summits");
             assertThat(results.next()).isFalse();
         }
     }
@@ -213,7 +213,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getFunctionColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getFunctionColumns("", "", "substr", "");
+            var results = conn.getMetaData().getFunctionColumns(null, null, "substr", null);
             assertThat(results.next()).isFalse();
         }
     }
@@ -221,7 +221,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getFunctions() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getFunctions("", "", "current_schema");
+            var results = conn.getMetaData().getFunctions(null, null, "current_schema");
             assertThat(results.next()).isTrue();
         }
     }
@@ -236,7 +236,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getImportedKeys() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getImportedKeys("", "sys", "summits");
+            var results = conn.getMetaData().getImportedKeys(null, "sys", "summits");
             assertThat(results.next()).isFalse();
         }
     }
@@ -246,7 +246,7 @@ public class JdbcMetaDataTest {
     // Error: Unknown function: pg_catalog.pg_get_indexdef(tmp.ci_oid, tmp.ordinal_position, false)")
     public void test_getIndexInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getIndexInfo("", "sys", "summits", true, true);
+            var results = conn.getMetaData().getIndexInfo(null, "sys", "summits", true, true);
             assertThat(results.next()).isFalse();
         }
     }
@@ -409,7 +409,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getPrimaryKeys() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            ResultSet results = conn.getMetaData().getPrimaryKeys(null, null, null);
+            var results = conn.getMetaData().getPrimaryKeys(null, null, null);
             assertThat(results.next()).isTrue();
         }
     }
@@ -417,7 +417,8 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getProcedureColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getProcedureColumns("", "", "", "");
+            var results = conn.getMetaData().getProcedureColumns(null, null, null, null);
+            assertThat(results.next()).isTrue();
         }
     }
 
@@ -431,7 +432,8 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getProcedures() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getProcedures("", "", "");
+            var results = conn.getMetaData().getProcedures(null, null, null);
+            assertThat(results.next()).isFalse();
         }
     }
 
@@ -439,7 +441,7 @@ public class JdbcMetaDataTest {
     @Ignore("Not implemented by PostgreSQL JDBC")
     public void test_getPseudoColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getPseudoColumns("", "sys", "summits", "m");
+            conn.getMetaData().getPseudoColumns(null, "sys", "summits", "m");
         }
     }
 
@@ -507,7 +509,7 @@ public class JdbcMetaDataTest {
     @Ignore("Not implemented in PostgreSQL JDBC")
     public void test_getSuperTables() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getSuperTables("", "sys", "summits");
+            conn.getMetaData().getSuperTables(null, "sys", "summits");
         }
     }
 
@@ -515,7 +517,7 @@ public class JdbcMetaDataTest {
     @Ignore("Not implemented in PostgreSQL JDBC")
     public void test_getSuperTypes() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getSuperTypes("", "sys", "t");
+            conn.getMetaData().getSuperTypes(null, "sys", "t");
         }
     }
 
@@ -529,7 +531,8 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getTablePrivileges() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getTablePrivileges("", "sys", "summits");
+            var results = conn.getMetaData().getTablePrivileges(null, "sys", "summits");
+            assertThat(results.next()).isFalse();
         }
     }
 
@@ -544,7 +547,7 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getTables() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            var results = conn.getMetaData().getTables(null, "sys", "", null);
+            var results = conn.getMetaData().getTables(null, "sys", null, null);
             assertThat(results.next()).isTrue();
             assertThat(results.getString(3)).isEqualTo("allocations_pkey");
         }
@@ -561,21 +564,23 @@ public class JdbcMetaDataTest {
     @Test
     public void test_getTypeInfo() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getTypeInfo();
+            var results = conn.getMetaData().getTypeInfo();
+            assertThat(results.next()).isTrue();
         }
     }
 
     @Test
     public void test_getUDTs() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-            conn.getMetaData().getUDTs("", "sys", "t", new int[0]);
+            var results = conn.getMetaData().getUDTs(null, "sys", "t", new int[0]);
+            assertThat(results.next()).isFalse();
         }
     }
 
     @Test
     public void test_getVersionColumns() throws Exception {
         try (var conn = DriverManager.getConnection(URL)) {
-             var results = conn.getMetaData().getVersionColumns("", "sys", "summits");
+             var results = conn.getMetaData().getVersionColumns(null, "sys", "summits");
              assertThat(results.next()).isTrue();
              assertThat(results.getString(2)).isEqualTo("ctid");
         }
