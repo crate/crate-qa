@@ -30,7 +30,7 @@ ROLLING_UPGRADES_V4 = (
 )
 
 ROLLING_UPGRADES_V5 = (
-    UpgradePath('5.10', 'branch:master'),
+    UpgradePath('5.10', 'branch:jeeminso/lr-bwc'),
 )
 
 
