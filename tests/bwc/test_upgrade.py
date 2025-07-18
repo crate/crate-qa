@@ -58,7 +58,7 @@ UPGRADE_PATHS = (
         VersionDef('5.8.x', []),
         VersionDef('5.9.x', []),
         VersionDef('5.10.x', []),
-        VersionDef('5.10', []),
+        VersionDef('6.0.x', []),
         VersionDef('latest-nightly', [])
     )
 )
@@ -160,7 +160,7 @@ def run_selects(c, version):
 
 def get_test_paths():
     """
-    Generater for all possible upgrade paths that should be tested.
+    Generator for all possible upgrade paths that should be tested.
     """
     for path in UPGRADE_PATHS:
         for versions in (path[x:] for x in range(len(path) - 1)):
