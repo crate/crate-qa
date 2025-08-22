@@ -1,13 +1,12 @@
-FROM node:15-buster
+FROM node:24-trixie
 
 RUN \
   groupadd jenkins && \
   useradd -u 1001 -g jenkins -m jenkins && \
   apt-get update && \
-  apt-get -y install python3-pip libpq5 libpq-dev sudo
+  apt-get -y install python3-pip python3-venv libpq5 libpq-dev sudo
 
-ENV HOME=/root
-WORKDIR /root
+WORKDIR /home/jenkins
 USER jenkins
 
 CMD ["bash"]

@@ -199,12 +199,6 @@ pipeline {
             dockerfile {
               label 'docker && x64'
               filename 'tests/client_tests/node-postgres/Dockerfile'
-
-              // Run container as root user.
-              // Note: This is needed to upgrade `node-gyp`.
-              // https://stackoverflow.com/questions/53090408/jenkins-pipeline-build-inside-container
-              // https://stackoverflow.com/questions/44805076/setting-build-args-for-dockerfile-agent-using-a-jenkins-declarative-pipeline
-              args '--user=root:root'
             }
           }
           steps {
@@ -215,26 +209,15 @@ pipeline {
             echo "Running job ${env.JOB_NAME}"
 
             sh label: 'Invoking test recipe', script: '''
-
               # Environment information.
               echo "Hostname: $(hostname -f)"
               echo "Node.js version: $(node --version)"
 
               # Setup `cr8`.
-              # Note: We don't use a virtualenv here as it looks like
-              #       it screws something up with the following procedure.
-              #       - https://github.com/nodejs/node-gyp/pull/1815
-              #       - https://github.com/nodejs/node-gyp/issues/2144
-              pip3 install --upgrade cr8
-
-              # Upgrade `node-gyp`.
-              # https://github.com/nodejs/node-gyp/issues/2272
-              # https://stackoverflow.com/questions/44633419/no-access-permission-error-with-npm-global-install-on-docker-image
-              # https://github.com/npm/npm/issues/16766#issuecomment-377950849
-              npm config set unsafe-perm=true
-              npm --global config set user root
-              npm install --global node-gyp@7.1.2
-              npm config set node_gyp $(npm prefix -g)/lib/node_modules/node-gyp/bin/node-gyp.js
+              test -d env && rm -rf env
+              python3 -m venv env
+              . env/bin/activate
+              python -m pip install -U cr8
 
               # Get ready.
               cd tests/client_tests/node-postgres
@@ -242,16 +225,9 @@ pipeline {
               # Install test prerequisites.
               npm install --verbose
 
-              # Prepare environment for CrateDB.
-              # CrateDB must not be run as `root`.
-              useradd -m testdrive
-              export HOME=$(pwd)
-
               # CrateDB needs a locale setting.
               export LANG=en_US.UTF-8
-
-              # Invoke test suite.
-              su testdrive ./run.sh
+              ./run.sh
             '''
           }
         }
