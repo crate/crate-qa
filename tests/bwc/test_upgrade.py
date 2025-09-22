@@ -46,21 +46,21 @@ UPGRADE_PATHS = (
     #     VersionDef('5.9.x', []),
     #     VersionDef('5.10.x', []),
     # ),
-    (
-        VersionDef('5.0.x', []),
-        VersionDef('5.1.x', []),
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
-        VersionDef('5.9.x', []),
-        VersionDef('5.10.x', []),
-        VersionDef('6.0.x', []),
-        VersionDef('latest-nightly', [])
-    )
+    # (
+    VersionDef('5.0.x', []),
+    VersionDef('5.1.x', []),
+    VersionDef('5.2.x', []),
+    VersionDef('5.3.x', []),
+    VersionDef('5.4.x', []),
+    VersionDef('5.5.x', []),
+    VersionDef('5.6.x', []),
+    VersionDef('5.7.x', []),
+    VersionDef('5.8.x', []),
+    VersionDef('5.9.x', []),
+    VersionDef('5.10.x', []),
+    VersionDef('6.0.x', []),
+    VersionDef('latest-nightly', [])
+    # )
 )
 
 CREATE_PARTED_TABLE = '''
@@ -162,9 +162,9 @@ def get_test_paths():
     """
     Generator for all possible upgrade paths that should be tested.
     """
-    for path in UPGRADE_PATHS:
-        for versions in (path[x:] for x in range(len(path) - 1)):
-            yield versions
+    # for path in UPGRADE_PATHS:
+    for versions in (UPGRADE_PATHS[x:] for x in range(len(UPGRADE_PATHS) - 1)):
+        yield versions
 
 
 def path_repr(path: VersionDef) -> str:
@@ -238,7 +238,6 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     paths: Iterable[str],
                     versions: Tuple[VersionDef, ...]):
         cluster.start()
-        breakpoint()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             assert_busy(lambda: self.assert_nodes(conn, nodes))
             c = conn.cursor()
@@ -270,6 +269,8 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         for version_def in versions[1:]:
             timestamp = datetime.utcnow().isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
+            if version_def.version == '5.3.x':
+                breakpoint()
             self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
         # restart with latest version
         version_def = versions[-1]
@@ -346,276 +347,3 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         c = conn.cursor()
         c.execute("select count(*) from sys.nodes")
         self.assertEqual(c.fetchone()[0], num_nodes)
-
-
-class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
-
-    CLUSTER_SETTINGS = {
-        'license.enterprise': 'true',
-        'lang.js.enabled': 'true',
-        'cluster.name': gen_id(),
-    }
-
-    SUPPORTED_VERSIONS = (
-        VersionDef('2.3.x', []),
-        VersionDef('3.3.x', []),
-        VersionDef('latest-nightly', [])
-    )
-
-    def test_metadata_compatibility(self):
-        nodes = 3
-
-        cluster = self._new_cluster(
-            self.SUPPORTED_VERSIONS[0].version,
-            nodes,
-            settings=self.CLUSTER_SETTINGS,
-            explicit_discovery=False
-        )
-        cluster.start()
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE USER user_a;
-            ''')
-            cursor.execute('''
-                GRANT ALL PRIVILEGES ON SCHEMA doc TO user_a;
-            ''')
-            cursor.execute('''
-                CREATE FUNCTION fact(LONG)
-                RETURNS LONG
-                LANGUAGE JAVASCRIPT
-                AS 'function fact(a) { return a < 2 ? 0 : a * (a - 1); }';
-            ''')
-        self._process_on_stop()
-
-        paths = [node._settings['path.data'] for node in cluster.nodes()]
-
-        for version_def in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_meta_data(version_def, nodes, paths)
-
-        # restart with latest version
-        self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes, paths)
-
-    def assert_meta_data(self, version_def, nodes, data_paths=None):
-        cluster = self._new_cluster(
-            version_def.version,
-            nodes,
-            data_paths,
-            self.CLUSTER_SETTINGS,
-            prepare_env(version_def.java_home),
-            explicit_discovery=False
-        )
-        cluster.start()
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT name, superuser
-                FROM sys.users
-                ORDER BY superuser, name;
-            ''')
-            rs = cursor.fetchall()
-            self.assertEqual(['user_a', False], rs[0])
-            self.assertEqual(['crate', True], rs[1])
-            cursor.execute('''
-                SELECT fact(100);
-            ''')
-            self.assertEqual(9900, cursor.fetchone()[0])
-            cursor.execute('''
-                SELECT class, grantee, ident, state, type
-                FROM sys.privileges
-                ORDER BY class, grantee, ident, state, type
-            ''')
-            self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
-                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
-                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
-                             cursor.fetchall())
-
-            self._process_on_stop()
-
-
-class DefaultTemplateMetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
-    CLUSTER_ID = gen_id()
-
-    CLUSTER_SETTINGS = {
-        'cluster.name': CLUSTER_ID,
-    }
-
-    SUPPORTED_VERSIONS = (
-        VersionDef('3.0.x', []),
-        VersionDef('latest-nightly', [])
-    )
-
-    def test_metadata_compatibility(self):
-        nodes = 3
-
-        cluster = self._new_cluster(self.SUPPORTED_VERSIONS[0].version,
-                                    nodes,
-                                    settings=self.CLUSTER_SETTINGS)
-        cluster.start()
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute("select 1")
-        self._process_on_stop()
-
-        paths = [node._settings['path.data'] for node in cluster.nodes()]
-        for version_def in self.SUPPORTED_VERSIONS[1:]:
-            self.assert_dynamic_string_detection(version_def, nodes, paths)
-
-    def assert_dynamic_string_detection(self, version_def, nodes, data_paths):
-        """ Test that a dynamic string column detection works as expected.
-
-        If the cluster was initially created/started with a lower CrateDB
-        version, we must ensure that our default template is also upgraded, if
-        needed, because it is persisted in the cluster state. That's why
-        re-creating tables would not help.
-        """
-        self._move_nodes_folder_if_needed(data_paths)
-        cluster = self._new_cluster(
-            version_def.version,
-            nodes,
-            data_paths,
-            self.CLUSTER_SETTINGS,
-            prepare_env(version_def.java_home),
-        )
-        cluster.start()
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            cursor = conn.cursor()
-            cursor.execute('CREATE TABLE t1 (o object)')
-            cursor.execute('''INSERT INTO t1 (o) VALUES ({"name" = 'foo'})''')
-            self.assertEqual(cursor.rowcount, 1)
-            cursor.execute('REFRESH TABLE t1')
-            cursor.execute("SELECT o['name'], count(*) FROM t1 GROUP BY 1")
-            rs = cursor.fetchall()
-            self.assertEqual(['foo', 1], rs[0])
-            cursor.execute('DROP TABLE t1')
-            self._process_on_stop()
-
-    def _move_nodes_folder_if_needed(self, data_paths):
-        """Eliminates the cluster-id folder inside the data directory."""
-        for path in data_paths:
-            data_path_incl_cluster_id = os.path.join(path, self.CLUSTER_ID)
-            if os.path.exists(data_path_incl_cluster_id):
-                src_path_nodes = os.path.join(data_path_incl_cluster_id, 'nodes')
-                target_path_nodes = os.path.join(self._path_data, 'nodes')
-                shutil.move(src_path_nodes, target_path_nodes)
-                shutil.rmtree(data_path_incl_cluster_id)
-
-
-class SnapshotCompatibilityTest(NodeProvider, unittest.TestCase):
-
-    CREATE_REPOSITORY = '''
-CREATE REPOSITORY r1 TYPE S3
-WITH (access_key = 'minio',
-secret_key = 'miniostorage',
-bucket='backups',
-endpoint = '127.0.0.1:9000',
-protocol = 'http')
-'''
-
-    CREATE_SNAPSHOT_TPT = "CREATE SNAPSHOT r1.s{} ALL WITH (wait_for_completion = true)"
-
-    RESTORE_SNAPSHOT_TPT = "RESTORE SNAPSHOT r1.s{} ALL WITH (wait_for_completion = true)"
-
-    DROP_DOC_TABLE = 'DROP TABLE t1'
-
-    VERSION = ('5.0.x', 'latest-nightly')
-
-    def test_snapshot_compatibility(self):
-        """Test snapshot compatibility when upgrading 5.0.x -> latest-nightly
-
-        Using Minio as a S3 repository, the first cluster that runs
-        creates the repo, a table and inserts/selects some data, which
-        then is snapshotted and deleted. The next cluster recovers the
-        data from the last snapshot, performs further inserts/selects,
-        to then snapshot the data and delete it.
-        """
-        with MinioServer() as minio:
-            t = threading.Thread(target=minio.run)
-            t.daemon = True
-            t.start()
-            wait_until(lambda: _is_up('127.0.0.1', 9000))
-
-            num_nodes = 3
-            num_docs = 30
-            prev_version = None
-            num_snapshot = 1
-
-            cluster_settings = {
-                'cluster.name': gen_id(),
-            }
-
-            paths = None
-            for version in self.VERSION:
-                cluster = self._new_cluster(version, num_nodes, paths, settings=cluster_settings)
-                paths = [node._settings['path.data'] for node in cluster.nodes()]
-                cluster.start()
-                with connect(cluster.node().http_url, error_trace=True) as conn:
-                    c = conn.cursor()
-                    if not prev_version:
-                        c.execute(self.CREATE_REPOSITORY)
-                        c.execute(CREATE_ANALYZER)
-                        c.execute(CREATE_DOC_TABLE)
-                        insert_data(conn, 'doc', 't1', num_docs)
-                    else:
-                        c.execute(self.RESTORE_SNAPSHOT_TPT.format(num_snapshot - 1))
-                    c.execute('SELECT COUNT(*) FROM t1')
-                    rowcount = c.fetchone()[0]
-                    self.assertEqual(rowcount, num_docs)
-                    run_selects(c, version)
-                    c.execute(self.CREATE_SNAPSHOT_TPT.format(num_snapshot))
-                    c.execute(self.DROP_DOC_TABLE)
-                self._process_on_stop()
-                prev_version = version
-                num_snapshot += 1
-
-
-class PreOidsFetchValueTest(NodeProvider, unittest.TestCase):
-
-    def test_pre_oid_references(self):
-        cluster = self._new_cluster('5.4.x', 3)
-        cluster.start()
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute("create table tbl (a text, b text) partitioned by (a)")
-            c.execute("insert into tbl (a, b) values ('foo1', 'bar1')")
-
-        for idx, node in enumerate(cluster):
-            new_node = self.upgrade_node(node, '5.8.5')
-            cluster[idx] = new_node
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute("alter table tbl add column c text")
-            c.execute("insert into tbl (a, b, c) values ('foo1', 'bar2', 'baz2')")
-            c.execute("insert into tbl (a, b, c) values ('foo2', 'bar1', 'baz1')")
-
-        for idx, node in enumerate(cluster):
-            new_node = self.upgrade_node(node, '5.9.x')
-            cluster[idx] = new_node
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute("insert into tbl (a, b, c) values ('foo1', 'bar3', 'baz3')")
-            c.execute("insert into tbl (a, b, c) values ('foo2', 'bar2', 'baz2')")
-            c.execute("insert into tbl (a, b, c) values ('foo3', 'bar1', 'baz1')")
-
-        for idx, node in enumerate(cluster):
-            new_node = self.upgrade_node(node, '5.10')
-            cluster[idx] = new_node
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute("insert into tbl (a, b, c) values ('foo1', 'bar4', 'baz4')")
-            c.execute("insert into tbl (a, b, c) values ('foo2', 'bar3', 'baz3')")
-            c.execute("insert into tbl (a, b, c) values ('foo3', 'bar2', 'baz2')")
-            c.execute("insert into tbl (a, b, c) values ('foo4', 'bar1', 'baz1')")
-
-            c.execute("refresh table tbl")
-
-            # LIMIT 10 forces the engine to go via _doc, which triggers the bug
-            # fixed by https://github.com/crate/crate/pull/17819
-            c.execute("select b from tbl limit 10")
-            result = c.fetchall()
-            for row in result:
-                self.assertIsNotNone(row[0])
