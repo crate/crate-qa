@@ -4,19 +4,26 @@ const Cursor = require("pg-cursor");
 let conn;
 let pool;
 
-beforeEach(async () => {
+beforeAll(() => {
   pool = new pg.Pool({
     user: "crate",
     password: "",
     host: "127.0.0.1",
     port: 5432
   })
+});
+
+afterAll(async () => {
+  await pool.end();
+});
+
+beforeEach(async () => {
   conn = await pool.connect();
   return conn;
 });
 
 afterEach(async () => {
-  conn.release();
+  await conn.release();
 });
 
 
