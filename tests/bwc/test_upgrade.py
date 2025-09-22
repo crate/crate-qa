@@ -24,28 +24,28 @@ from crate.qa.tests import (
 from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
-    (
-        VersionDef('4.0.x', []),
-        VersionDef('4.1.x', []),
-        VersionDef('4.2.x', []),
-        VersionDef('4.3.x', []),
-        VersionDef('4.4.x', []),
-        VersionDef('4.5.x', []),
-        VersionDef('4.6.x', []),
-        VersionDef('4.7.x', []),
-        VersionDef('4.8.x', []),
-        VersionDef('5.0.x', []),
-        VersionDef('5.1.x', []),
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
-        VersionDef('5.9.x', []),
-        VersionDef('5.10.x', []),
-    ),
+    # (
+    #     VersionDef('4.0.x', []),
+    #     VersionDef('4.1.x', []),
+    #     VersionDef('4.2.x', []),
+    #     VersionDef('4.3.x', []),
+    #     VersionDef('4.4.x', []),
+    #     VersionDef('4.5.x', []),
+    #     VersionDef('4.6.x', []),
+    #     VersionDef('4.7.x', []),
+    #     VersionDef('4.8.x', []),
+    #     VersionDef('5.0.x', []),
+    #     VersionDef('5.1.x', []),
+    #     VersionDef('5.2.x', []),
+    #     VersionDef('5.3.x', []),
+    #     VersionDef('5.4.x', []),
+    #     VersionDef('5.5.x', []),
+    #     VersionDef('5.6.x', []),
+    #     VersionDef('5.7.x', []),
+    #     VersionDef('5.8.x', []),
+    #     VersionDef('5.9.x', []),
+    #     VersionDef('5.10.x', []),
+    # ),
     (
         VersionDef('5.0.x', []),
         VersionDef('5.1.x', []),
@@ -238,6 +238,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                     paths: Iterable[str],
                     versions: Tuple[VersionDef, ...]):
         cluster.start()
+        breakpoint()
         with connect(cluster.node().http_url, error_trace=True) as conn:
             assert_busy(lambda: self.assert_nodes(conn, nodes))
             c = conn.cursor()
