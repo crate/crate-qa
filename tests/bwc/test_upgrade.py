@@ -31,7 +31,7 @@ UPGRADE_PATHS = (
     (
         VersionDef('5.10.x', []),
         VersionDef('6.0.x', []),
-        VersionDef('branch:4b8f257b150f64d4f31bc58e2da9bc0363b60bb7', [])
+        VersionDef('branch:551232a01a1a243f7e56432c92a44add8e48ad87', [])
     )
 )
 
