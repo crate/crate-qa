@@ -220,19 +220,22 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
                 # Ensure match queries work. Table level dedicated index column mapping has been changed in 5.4.
                 c.execute('''
-                    SELECT title, author
+                    SELECT value, title, author
                     FROM doc.t1
                     WHERE MATCH(composite_nested_ft, 'matchMe')
                     ORDER BY value
                 ''')
                 res = c.fetchall()
+                print("Results for match query:")
+                print(res[0])
+                print(res[1])
                 self.assertEqual(len(res), 2)
                 # only title matches
-                self.assertEqual(res[0][0], 'matchMe title')
-                self.assertEqual(res[0][1], {'name': 'no match name'})
+                self.assertEqual(res[0][1], 'matchMe title')
+                self.assertEqual(res[0][2], {'name': 'no match name'})
                 # only name matches
-                self.assertEqual(res[1][0], 'no match title')
-                self.assertEqual(res[1][1], {'name': 'matchMe name'})
+                self.assertEqual(res[1][1], 'no match title')
+                self.assertEqual(res[1][2], {'name': 'matchMe name'})
 
                 # Dynamically added empty arrays and ignored object sub-columns are indexed with special prefix starting from 5.5
                 # Ensure that reading such columns work across all versions.
