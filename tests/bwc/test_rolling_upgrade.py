@@ -192,6 +192,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     [['TABLE', 'arthur', 'crate', 'doc.t1', 'DENY', 'DQL'],
                      ['CLUSTER', 'arthur', 'crate', None, 'GRANT', 'DQL']])
 
+                c.execute("REFRESH TABLE doc.t1")
                 c.execute('''
                     SELECT type, AVG(value)
                     FROM doc.t1
@@ -286,10 +287,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
             c = conn.cursor()
+            c.execute("REFRESH TABLE doc.parted")
             wait_for_active_shards(c, expected_active_shards)
-            c.execute('''
-                REFRESH TABLE doc.parted
-            ''')
             c.execute('''
                 SELECT count(*)
                 FROM doc.parted
