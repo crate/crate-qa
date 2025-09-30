@@ -249,7 +249,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             # There was a behavior change in 5.9. After fully upgrading all nodes in the cluster, newly added
             # partitions' version created will follow the upgraded version.
             # E.g., when 5.9 -> 5.10 is completed, the version created for new partitions will be 5.10
-            if old_node.version[1] >= 9:
+            if old_node.version >= (5, 9, 0):
                 c.execute("insert into doc.t3 (a, b) values (?, ?)", [idx, idx])
                 new_shards += 1
                 c.execute("refresh table t3")
