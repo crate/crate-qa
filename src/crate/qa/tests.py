@@ -241,54 +241,53 @@ class NodeProvider:
         new_node.start()
         return new_node
 
+    def _new_node(self, version: str, settings=None, env=None) -> tuple[CrateNode, tuple[int, int, int]]:
+        crate_dir = get_crate(version)
+        version_tuple = _extract_version(crate_dir)
+        s = {
+            'cluster.name': 'crate-qa',
+        }
+        s.update(settings or {})
+        s.update(test_settings(version_tuple))
+
+        """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
+        However, we don't want to re-generate data path if we create a node based on existing settings, for example
+        upgrade_node calls this method with old_node._settings
+        """
+        if "path.data" not in s:
+            s['path.data'] = self.mkdtemp()
+        if "path.logs" not in s:
+            s["path.logs"] = self.mkdtemp()
+
+        s = remove_unsupported_settings(version_tuple, s)
+        e = {
+            'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+            'CRATE_DISABLE_GC_LOGGING': '1',
+            'CRATE_HOME': crate_dir,
+        }
+        e.update(env or {})
+
+        if self.DEBUG:
+            print(f'# Running CrateDB {version} ({version_tuple}) ...')
+            s_nice = pformat(s)
+            print(f'with settings: {s_nice}')
+            e_nice = pformat(e)
+            print(f'with environment: {e_nice}')
+
+        n = CrateNode(
+            crate_dir=crate_dir,
+            keep_data=True,
+            settings=s,
+            env=e,
+        )
+        setattr(n, "_settings", s)  # CrateNode does not hold its settings
+        self._add_log_consumer(n)
+        self._on_stop.append(n)
+        return (n, version_tuple)
+
     def setUp(self):
         self._on_stop = []
         self._log_consumers = []
-
-        def new_node(version: str, settings=None, env=None) -> tuple[CrateNode, tuple[int, int, int]]:
-            crate_dir = get_crate(version)
-            version_tuple = _extract_version(crate_dir)
-            s = {
-                'cluster.name': 'crate-qa',
-            }
-            s.update(settings or {})
-            s.update(test_settings(version_tuple))
-
-            """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
-            However, we don't want to re-generate data path if we create a node based on existing settings, for example
-            upgrade_node calls this method with old_node._settings
-            """
-            if "path.data" not in s:
-                s['path.data'] = self.mkdtemp()
-            if "path.logs" not in s:
-                s["path.logs"] = self.mkdtemp()
-
-            s = remove_unsupported_settings(version_tuple, s)
-            e = {
-                'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
-                'CRATE_DISABLE_GC_LOGGING': '1',
-                'CRATE_HOME': crate_dir,
-            }
-            e.update(env or {})
-
-            if self.DEBUG:
-                print(f'# Running CrateDB {version} ({version_tuple}) ...')
-                s_nice = pformat(s)
-                print(f'with settings: {s_nice}')
-                e_nice = pformat(e)
-                print(f'with environment: {e_nice}')
-
-            n = CrateNode(
-                crate_dir=crate_dir,
-                keep_data=True,
-                settings=s,
-                env=e,
-            )
-            setattr(n, "_settings", s)  # CrateNode does not hold its settings
-            self._add_log_consumer(n)
-            self._on_stop.append(n)
-            return (n, version_tuple)
-        self._new_node = new_node
 
     def tearDown(self):
         self._crate_logs_on_failure()
