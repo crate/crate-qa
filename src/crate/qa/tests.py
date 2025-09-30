@@ -71,7 +71,7 @@ def remove_unsupported_settings(version: Tuple[int, int, int], settings: dict) -
     return new_settings
 
 
-def columns_for_table(conn, schema, table):
+def columns_for_table(conn, schema, table) -> list[Column]:
     c = conn.cursor()
     c.execute("SELECT min(version['number']) FROM sys.nodes")
     version = parse_version(c.fetchone()[0])
@@ -133,7 +133,7 @@ class VersionDef(NamedTuple):
 
 class CrateCluster:
 
-    def __init__(self, nodes=[]):
+    def __init__(self, nodes: list[CrateNode]):
         self._nodes = nodes
 
     def start(self):
@@ -148,10 +148,10 @@ class CrateCluster:
         for node in self._nodes:
             node.stop()
 
-    def node(self):
+    def node(self) -> CrateNode:
         return random.choice(self._nodes)
 
-    def nodes(self):
+    def nodes(self) -> list[CrateNode]:
         return self._nodes
 
     def __next__(self):
@@ -174,7 +174,7 @@ class NodeProvider:
         self.tmpdirs = []
         super().__init__(*args, **kwargs)
 
-    def mkdtemp(self, *args):
+    def mkdtemp(self, *args) -> str:
         tmp = tempfile.mkdtemp()
         self.tmpdirs.append(tmp)
         return os.path.join(tmp, *args)
@@ -233,10 +233,11 @@ class NodeProvider:
             nodes.append(self._new_node(version, s)[0])
         return CrateCluster(nodes)
 
-    def upgrade_node(self, old_node, new_version):
+    def upgrade_node(self, old_node: CrateNode, new_version: str) -> CrateNode:
         old_node.stop()
         self._on_stop.remove(old_node)
-        (new_node, _) = self._new_node(new_version, settings=old_node._settings)
+        settings = getattr(old_node, "_settings", {})
+        (new_node, _) = self._new_node(new_version, settings=settings)
         new_node.start()
         return new_node
 
@@ -244,7 +245,7 @@ class NodeProvider:
         self._on_stop = []
         self._log_consumers = []
 
-        def new_node(version, settings=None, env=None):
+        def new_node(version: str, settings=None, env=None) -> tuple[CrateNode, tuple[int, int, int]]:
             crate_dir = get_crate(version)
             version_tuple = _extract_version(crate_dir)
             s = {
@@ -283,7 +284,7 @@ class NodeProvider:
                 settings=s,
                 env=e,
             )
-            n._settings = s  # CrateNode does not hold its settings
+            setattr(n, "_settings", s)  # CrateNode does not hold its settings
             self._add_log_consumer(n)
             self._on_stop.append(n)
             return (n, version_tuple)
@@ -343,7 +344,8 @@ def assert_busy(assertion, timeout=120, f=2.0):
             time.sleep(sleep_interval_sec)
             waited += sleep_interval_sec
             sleep_interval_sec *= f
-    raise assertion_error
+    if assertion_error:
+        raise assertion_error
 
 
 class FunctionTimeoutError(Exception):
