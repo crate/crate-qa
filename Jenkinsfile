@@ -161,7 +161,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               ./tests/client_tests/haskell/run.sh
             '''
           }
@@ -189,7 +189,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               (cd tests/client_tests/rust/ && ./run.sh)
             '''
           }
@@ -246,7 +246,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               (cd tests/client_tests/stock_npgsql && ./run.sh)
             '''
           }
