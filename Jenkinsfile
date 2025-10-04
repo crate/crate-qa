@@ -21,18 +21,33 @@ pipeline {
             sh 'env/bin/flake8 src/ tests/'
           }
         }
-        stage('Python bwc-rolling-upgrade tests') {
+        stage('Python bwc-rolling-upgrade tests 4-5') {
           agent { label 'medium && x64' }
           tools { jdk 'jdk11' }
           steps {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.11 -m venv env
+              uv venv env
               source env/bin/activate
-              python -m pip install -U -e .
+              uv pip install -U -e .
 
-              (cd tests/bwc && python -m unittest -vvvf test_rolling_upgrade.py)
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_4_to_5)
+            '''
+          }
+        }
+        stage('Python bwc-rolling-upgrade tests 5-6') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk11' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              uv venv env
+              source env/bin/activate
+              uv pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_5_to_6)
             '''
           }
         }
