@@ -21,18 +21,33 @@ pipeline {
             sh 'env/bin/flake8 src/ tests/'
           }
         }
-        stage('Python bwc-rolling-upgrade tests') {
+        stage('Python bwc-rolling-upgrade tests 4-5') {
           agent { label 'medium && x64' }
           tools { jdk 'jdk11' }
           steps {
             checkout scm
             sh '''
               rm -rf env
-              /usr/bin/python3.11 -m venv env
+              uv venv env
               source env/bin/activate
-              python -m pip install -U -e .
+              uv pip install -U -e .
 
-              (cd tests/bwc && python -m unittest -vvvf test_rolling_upgrade.py)
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_4_to_5)
+            '''
+          }
+        }
+        stage('Python bwc-rolling-upgrade tests 5-6') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk11' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf env
+              uv venv env
+              source env/bin/activate
+              uv pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_5_to_6)
             '''
           }
         }
@@ -161,7 +176,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               ./tests/client_tests/haskell/run.sh
             '''
           }
@@ -189,7 +204,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               (cd tests/client_tests/rust/ && ./run.sh)
             '''
           }
@@ -246,7 +261,7 @@ pipeline {
               test -d env && rm -rf env
               python3 -m venv env
               . env/bin/activate
-              python -m pip install -U cr8
+              python -m pip install -U cr8==0.27.2
               (cd tests/client_tests/stock_npgsql && ./run.sh)
             '''
           }

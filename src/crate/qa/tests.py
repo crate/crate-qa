@@ -71,7 +71,7 @@ def remove_unsupported_settings(version: Tuple[int, int, int], settings: dict) -
     return new_settings
 
 
-def columns_for_table(conn, schema, table):
+def columns_for_table(conn, schema, table) -> list[Column]:
     c = conn.cursor()
     c.execute("SELECT min(version['number']) FROM sys.nodes")
     version = parse_version(c.fetchone()[0])
@@ -133,7 +133,7 @@ class VersionDef(NamedTuple):
 
 class CrateCluster:
 
-    def __init__(self, nodes=[]):
+    def __init__(self, nodes: list[CrateNode]):
         self._nodes = nodes
 
     def start(self):
@@ -148,10 +148,10 @@ class CrateCluster:
         for node in self._nodes:
             node.stop()
 
-    def node(self):
+    def node(self) -> CrateNode:
         return random.choice(self._nodes)
 
-    def nodes(self):
+    def nodes(self) -> list[CrateNode]:
         return self._nodes
 
     def __next__(self):
@@ -174,7 +174,7 @@ class NodeProvider:
         self.tmpdirs = []
         super().__init__(*args, **kwargs)
 
-    def mkdtemp(self, *args):
+    def mkdtemp(self, *args) -> str:
         tmp = tempfile.mkdtemp()
         self.tmpdirs.append(tmp)
         return os.path.join(tmp, *args)
@@ -233,61 +233,61 @@ class NodeProvider:
             nodes.append(self._new_node(version, s)[0])
         return CrateCluster(nodes)
 
-    def upgrade_node(self, old_node, new_version):
+    def upgrade_node(self, old_node: CrateNode, new_version: str) -> CrateNode:
         old_node.stop()
         self._on_stop.remove(old_node)
-        (new_node, _) = self._new_node(new_version, settings=old_node._settings)
+        settings = getattr(old_node, "_settings", {})
+        (new_node, _) = self._new_node(new_version, settings=settings)
         new_node.start()
         return new_node
+
+    def _new_node(self, version: str, settings=None, env=None) -> tuple[CrateNode, tuple[int, int, int]]:
+        crate_dir = get_crate(version)
+        version_tuple = _extract_version(crate_dir)
+        s = {
+            'cluster.name': 'crate-qa',
+        }
+        s.update(settings or {})
+        s.update(test_settings(version_tuple))
+
+        """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
+        However, we don't want to re-generate data path if we create a node based on existing settings, for example
+        upgrade_node calls this method with old_node._settings
+        """
+        if "path.data" not in s:
+            s['path.data'] = self.mkdtemp()
+        if "path.logs" not in s:
+            s["path.logs"] = self.mkdtemp()
+
+        s = remove_unsupported_settings(version_tuple, s)
+        e = {
+            'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
+            'CRATE_DISABLE_GC_LOGGING': '1',
+            'CRATE_HOME': crate_dir,
+        }
+        e.update(env or {})
+
+        if self.DEBUG:
+            print(f'# Running CrateDB {version} ({version_tuple}) ...')
+            s_nice = pformat(s)
+            print(f'with settings: {s_nice}')
+            e_nice = pformat(e)
+            print(f'with environment: {e_nice}')
+
+        n = CrateNode(
+            crate_dir=crate_dir,
+            keep_data=True,
+            settings=s,
+            env=e,
+        )
+        setattr(n, "_settings", s)  # CrateNode does not hold its settings
+        self._add_log_consumer(n)
+        self._on_stop.append(n)
+        return (n, version_tuple)
 
     def setUp(self):
         self._on_stop = []
         self._log_consumers = []
-
-        def new_node(version, settings=None, env=None):
-            crate_dir = get_crate(version)
-            version_tuple = _extract_version(crate_dir)
-            s = {
-                'cluster.name': 'crate-qa',
-            }
-            s.update(settings or {})
-            s.update(test_settings(version_tuple))
-
-            """ After removal of the node.max_local_storage_nodes in 5.0, every node has it's own path.data generated on node creation.
-            However, we don't want to re-generate data path if we create a node based on existing settings, for example
-            upgrade_node calls this method with old_node._settings
-            """
-            if "path.data" not in s:
-                s['path.data'] = self.mkdtemp()
-            if "path.logs" not in s:
-                s["path.logs"] = self.mkdtemp()
-
-            s = remove_unsupported_settings(version_tuple, s)
-            e = {
-                'CRATE_HEAP_SIZE': self.CRATE_HEAP_SIZE,
-                'CRATE_DISABLE_GC_LOGGING': '1',
-                'CRATE_HOME': crate_dir,
-            }
-            e.update(env or {})
-
-            if self.DEBUG:
-                print(f'# Running CrateDB {version} ({version_tuple}) ...')
-                s_nice = pformat(s)
-                print(f'with settings: {s_nice}')
-                e_nice = pformat(e)
-                print(f'with environment: {e_nice}')
-
-            n = CrateNode(
-                crate_dir=crate_dir,
-                keep_data=True,
-                settings=s,
-                env=e,
-            )
-            n._settings = s  # CrateNode does not hold its settings
-            self._add_log_consumer(n)
-            self._on_stop.append(n)
-            return (n, version_tuple)
-        self._new_node = new_node
 
     def tearDown(self):
         self._crate_logs_on_failure()
@@ -343,7 +343,8 @@ def assert_busy(assertion, timeout=120, f=2.0):
             time.sleep(sleep_interval_sec)
             waited += sleep_interval_sec
             sleep_interval_sec *= f
-    raise assertion_error
+    if assertion_error:
+        raise assertion_error
 
 
 class FunctionTimeoutError(Exception):
