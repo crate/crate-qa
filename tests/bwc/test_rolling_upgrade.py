@@ -205,16 +205,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             ORDER BY value
         ''')
         res = c.fetchall()
-        print("Results for match query:")
-        print(res[0])
-        print(res[1])
-        self.assertEqual(len(res), 2)
-        # only title matches
-        self.assertEqual(res[0][1], 'matchMe title')
-        self.assertEqual(res[0][2], {'name': 'no match name'})
-        # only name matches
-        self.assertEqual(res[1][1], 'no match title')
-        self.assertEqual(res[1][2], {'name': 'matchMe name'})
+        self.assertEqual(res, [
+            [1.0, "matchMe title", {"name": "no match name"}],
+            [2.0, "no match title", {"name": "matchMe name"}],
+        ])
 
         # Dynamically added empty arrays and ignored object sub-columns are indexed with special prefix starting from 5.5
         # Ensure that reading such columns work across all versions.
