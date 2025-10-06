@@ -234,10 +234,15 @@ class NodeProvider:
         return CrateCluster(nodes)
 
     def upgrade_node(self, old_node: CrateNode, new_version: str) -> CrateNode:
+        port = int(f"5{old_node.addresses.http.port}")
         old_node.stop()
         self._on_stop.remove(old_node)
         settings = getattr(old_node, "_settings", {})
-        (new_node, _) = self._new_node(new_version, settings=settings)
+        env = {}
+        if os.environ.get("DEBUGPY_RUNNING", "false") == "true":
+            jdwp = f"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={port}"
+            env["CRATE_JAVA_OPTS"] = jdwp
+        (new_node, _) = self._new_node(new_version, settings=settings, env=env)
         new_node.start()
         return new_node
 
