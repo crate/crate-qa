@@ -36,9 +36,37 @@ test("can use cursor to fetch subset of result with many reads", async () => {
   let res2 = await cursor.read(10);
   let res3 = await cursor.read(10);
 
-  expect(res1).toHaveLength(5);
-  expect(res2).toHaveLength(10);
-  expect(res3).toHaveLength(10);
+  expect(res1).toStrictEqual([
+    { generate_series: 1 },
+    { generate_series: 2 },
+    { generate_series: 3 },
+    { generate_series: 4 },
+    { generate_series: 5 },
+  ]);
+  expect(res2).toStrictEqual([
+    { generate_series: 6 },
+    { generate_series: 7 },
+    { generate_series: 8 },
+    { generate_series: 9 },
+    { generate_series: 10 },
+    { generate_series: 11 },
+    { generate_series: 12 },
+    { generate_series: 13 },
+    { generate_series: 14 },
+    { generate_series: 15 },
+  ]);
+  expect(res3).toStrictEqual([
+    { generate_series: 16 },
+    { generate_series: 17 },
+    { generate_series: 18 },
+    { generate_series: 19 },
+    { generate_series: 20 },
+    { generate_series: 21 },
+    { generate_series: 22 },
+    { generate_series: 23 },
+    { generate_series: 24 },
+    { generate_series: 25 },
+  ]);
 
   await cursor.close();
 });
@@ -51,8 +79,17 @@ test("can use cursor to fetch full result with many reads", async () => {
   let res1 = await cursor.read(5);
   let res2 = await cursor.read(10);
 
-  expect(res1).toHaveLength(5);
-  expect(res2).toHaveLength(2);
+  expect(res1).toStrictEqual([
+    { generate_series: 1 },
+    { generate_series: 2 },
+    { generate_series: 3 },
+    { generate_series: 4 },
+    { generate_series: 5 },
+  ]);
+  expect(res2).toStrictEqual([
+    { generate_series: 6 },
+    { generate_series: 7 },
+  ]);
 
   await cursor.close();
 });
