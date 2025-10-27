@@ -14,7 +14,7 @@ ROLLING_UPGRADES_V4 = (
 
 ROLLING_UPGRADES_V5 = (
 
-    UpgradePath('5.10', '6.0'),
+    UpgradePath('6.0.x', '6.0'),
     # UpgradePath('6.0.x', '6.0'),
     # UpgradePath('6.0', '6.1.x'),
     # UpgradePath('6.1.x', '6.1'),
@@ -358,7 +358,7 @@ def test_foreign_data_wrapper(self, local_conn: Connection, remote_conn: Connect
     self.assertEqual(c.fetchall()[0][0], count + 1)
 
 
-def init_logical_replication_data(self, local_conn: Connection, remote_conn: Connection, local_transport_port:int, remote_transport_port: int, local_active_shards: int) -> int:
+def init_logical_replication_data(self, local_conn: Connection, remote_conn: Connection, local_transport_port: int, remote_transport_port: int, local_active_shards: int) -> int:
     assert 4300 <= local_transport_port <= 4310 and 4300 <= remote_transport_port <= 4310
 
     c = local_conn.cursor()
