@@ -14,7 +14,7 @@ ROLLING_UPGRADES_V4 = (
 
 ROLLING_UPGRADES_V5 = (
 
-    UpgradePath('5.10', '6.0.x'),
+    UpgradePath('5.10', '6.0'),
     # UpgradePath('6.0.x', '6.0'),
     # UpgradePath('6.0', '6.1.x'),
     # UpgradePath('6.1.x', '6.1'),
@@ -372,7 +372,7 @@ def init_logical_replication_data(self, local_conn: Connection, remote_conn: Con
     rc.execute(f"create subscription rs connection 'crate://localhost:{local_transport_port}?user=crate&sslmode=sniff' publication p")
     c.execute(f"create subscription s connection 'crate://localhost:{remote_transport_port}?user=crate&sslmode=sniff' publication rp")
 
-    new_shards = 2 # 1 shard for doc.x and another 1 shard for doc.rx
+    new_shards = 2  # 1 shard for doc.x and another 1 shard for doc.rx
     wait_for_active_shards(rc, new_shards)
     wait_for_active_shards(c, local_active_shards + new_shards)
     assert_busy(lambda: self.assertEqual(num_docs_x(rc), 0))
