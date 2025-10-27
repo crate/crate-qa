@@ -70,16 +70,14 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         with connect(node.http_url, error_trace=True) as conn:
             new_shards = init_data(conn, node.version, shards, replicas)
             expected_active_shards += new_shards
-            if node.version >= (5, 7, 0):
-                remote_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
-                remote_cluster.start()
-                remote_node = remote_cluster.node()
-                with connect(remote_node.http_url, error_trace=True) as remote_conn:
-                    new_shards = init_foreign_data_wrapper_data(conn, remote_conn, node.addresses.psql.port, remote_node.addresses.psql.port)
-                    expected_active_shards += new_shards
-                    if node.version >= (5, 10, 0):
-                        new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
-                        expected_active_shards += new_shards
+            remote_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
+            remote_cluster.start()
+            remote_node = remote_cluster.node()
+            with connect(remote_node.http_url, error_trace=True) as remote_conn:
+                new_shards = init_foreign_data_wrapper_data(conn, remote_conn, node.addresses.psql.port, remote_node.addresses.psql.port)
+                expected_active_shards += new_shards
+                new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
+                expected_active_shards += new_shards
 
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
@@ -110,12 +108,10 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                 c = conn.cursor()
                 new_shards = self._test_queries_on_new_node(idx, c, node, new_node, nodes, shards, expected_active_shards)
                 expected_active_shards += new_shards
-                if node.version >= (5, 7, 0):
-                    assert remote_node is not None
-                    with connect(remote_node.http_url, error_trace=True) as remote_conn:
-                        test_foreign_data_wrapper(self, conn, remote_conn)
-                        if node.version >= (5, 10, 0):
-                            test_logical_replication_queries(self, conn, remote_conn)
+                assert remote_node is not None
+                with connect(remote_node.http_url, error_trace=True) as remote_conn:
+                    test_foreign_data_wrapper(self, conn, remote_conn)
+                    test_logical_replication_queries(self, conn, remote_conn)
 
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
@@ -222,31 +218,30 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         new_shards += shards_per_partition
 
         # Ensure table/partition versions created are correct
-        if old_node.version >= (5, 0, 0):
-            c.execute("insert into doc.t2 (a, b) values (?, ?)", [idx, idx])
-            c.execute("refresh table t2")
-            c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t2 where a = ?", [idx])
-            self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
-            old_version = '.'.join(map(str, old_node.version))
-            c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't2'")
-            self.assertEqual(c.fetchall(), [[old_version]])
-            # There was a behavior change in 5.9. After fully upgrading all nodes in the cluster, newly added
-            # partitions' version created will follow the upgraded version.
-            # E.g., when 5.9 -> 5.10 is completed, the version created for new partitions will be 5.10
-            if old_node.version >= (5, 9, 0):
-                c.execute("insert into doc.t3 (a, b) values (?, ?)", [idx, idx])
-                new_shards += 1
-                c.execute("refresh table t3")
-                c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t3 where a = ?", [idx])
-                self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
-                c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't3'")
-                self.assertEqual(c.fetchall(), [[old_version]])
-                partition_version = old_version
-                if idx == num_nodes - 1:
-                    # the partition added after all nodes are upgraded should follow the upgraded(latest) version
-                    partition_version = '.'.join(map(str, new_node.version))
-                c.execute("select version['created'] from information_schema.table_partitions where table_name = 't3' and values['a'] = ?", [idx])
-                self.assertEqual(c.fetchall(), [[partition_version]])
+
+        c.execute("insert into doc.t2 (a, b) values (?, ?)", [idx, idx])
+        c.execute("refresh table t2")
+        c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t2 where a = ?", [idx])
+        self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
+        old_version = '.'.join(map(str, old_node.version))
+        c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't2'")
+        self.assertEqual(c.fetchall(), [[old_version]])
+        # There was a behavior change in 5.9. After fully upgrading all nodes in the cluster, newly added
+        # partitions' version created will follow the upgraded version.
+        # E.g., when 5.9 -> 5.10 is completed, the version created for new partitions will be 5.10
+        c.execute("insert into doc.t3 (a, b) values (?, ?)", [idx, idx])
+        new_shards += 1
+        c.execute("refresh table t3")
+        c.execute("select a, b, c>=1 and c<=2, d>a+b from doc.t3 where a = ?", [idx])
+        self.assertEqual(c.fetchall(), [[idx, idx, True, True]])
+        c.execute("select distinct(version['created']) from information_schema.tables where table_name = 't3'")
+        self.assertEqual(c.fetchall(), [[old_version]])
+        partition_version = old_version
+        if idx == num_nodes - 1:
+            # the partition added after all nodes are upgraded should follow the upgraded(latest) version
+            partition_version = '.'.join(map(str, new_node.version))
+        c.execute("select version['created'] from information_schema.table_partitions where table_name = 't3' and values['a'] = ?", [idx])
+        self.assertEqual(c.fetchall(), [[partition_version]])
         return new_shards
 
 
@@ -276,26 +271,25 @@ def init_data(conn: Connection, version: tuple[int, int, int], shards: int, repl
     c.execute("INSERT INTO doc.t1 (type, value, title, author) VALUES (2, 2, 'no match title', {name='matchMe name'})")
     c.execute("INSERT INTO doc.t1 (title, author, o) VALUES ('prefix_check', {\"dyn_empty_array\" = []}, {\"dyn_ignored_subcol\" = 'hello'})")
 
-    if version >= (5, 0, 0):
-        c.execute('''
-            create table doc.t2 (
-                a int primary key,
-                b int not null,
-                c int default (random() + 1),
-                d generated always as (a + b + c),
-                constraint d CHECK (d > a + b)
-            ) clustered into 1 shards with (number_of_replicas = 0)
-        ''')
-        new_shards += 1
-        c.execute('''
-            create table doc.t3 (
-                a int primary key,
-                b int not null,
-                c int default (random() + 1),
-                d generated always as (a + b + c),
-                constraint d CHECK (d > a + b)
-            ) partitioned by (a) clustered into 1 shards with (number_of_replicas = 0)
-        ''')
+    c.execute('''
+        create table doc.t2 (
+            a int primary key,
+            b int not null,
+            c int default (random() + 1),
+            d generated always as (a + b + c),
+            constraint d CHECK (d > a + b)
+        ) clustered into 1 shards with (number_of_replicas = 0)
+    ''')
+    new_shards += 1
+    c.execute('''
+        create table doc.t3 (
+            a int primary key,
+            b int not null,
+            c int default (random() + 1),
+            d generated always as (a + b + c),
+            constraint d CHECK (d > a + b)
+        ) partitioned by (a) clustered into 1 shards with (number_of_replicas = 0)
+    ''')
 
     c.execute('''
         CREATE FUNCTION foo(INT)
