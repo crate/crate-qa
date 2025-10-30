@@ -399,6 +399,8 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         self.assert_meta_data(self.SUPPORTED_VERSIONS[-1], nodes, paths)
 
     def assert_meta_data(self, version_def, nodes, data_paths=None):
+        timestamp = datetime.utcnow().isoformat(timespec='seconds')
+        print(f"{timestamp} Upgrade to: {version_def.version}")
         cluster = self._new_cluster(
             version_def.version,
             nodes,
@@ -416,6 +418,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                 ORDER BY superuser, name;
             ''')
             rs = cursor.fetchall()
+            self.assertEqual([['user_a', False], ['crate', True]], rs)
             self.assertEqual(['user_a', False], rs[0])
             self.assertEqual(['crate', True], rs[1])
             cursor.execute('''
