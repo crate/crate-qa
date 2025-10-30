@@ -47,7 +47,7 @@ ROLLING_UPGRADES_V5 = (
     UpgradePath('6.0.x', '6.0'),
     UpgradePath('6.0', '6.1.x'),
     UpgradePath('6.1.x', '6.1'),
-    UpgradePath('6.1', 'latest-nightly'),
+    UpgradePath('6.1', 'branch:mt/node-role'),
 )
 
 
