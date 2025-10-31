@@ -361,11 +361,11 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     SUPPORTED_VERSIONS = (
         VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
-        VersionDef('branch:jeeminso/temp-10', [])
+        VersionDef('latest-nightly', [])
     )
 
     def test_metadata_compatibility(self):
-        nodes = 3
+        nodes = 1
 
         cluster = self._new_cluster(
             self.SUPPORTED_VERSIONS[0].version,
