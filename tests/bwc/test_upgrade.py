@@ -191,11 +191,12 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     SUPPORTED_VERSIONS = (
         VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
+        VersionDef('5.10.13', []),
         VersionDef('6.0.0', []),
     )
 
     def test_metadata_compatibility(self):
-        nodes = 1
+        nodes = 3
 
         cluster = self._new_cluster(
             self.SUPPORTED_VERSIONS[0].version,
@@ -207,16 +208,16 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         with connect(cluster.node().http_url, error_trace=True) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                revoke all privileges on schema doc from user_a
-            ''')
-            cursor.execute('''
-                drop user if exists user_a
-            ''')
-            cursor.execute('''
                 CREATE USER user_a;
             ''')
             cursor.execute('''
                 GRANT ALL PRIVILEGES ON SCHEMA doc TO user_a;
+            ''')
+            cursor.execute('''
+                CREATE FUNCTION fact(LONG)
+                RETURNS LONG
+                LANGUAGE JAVASCRIPT
+                AS 'function fact(a) { return a < 2 ? 0 : a * (a - 1); }';
             ''')
         self._process_on_stop()
 
@@ -251,4 +252,14 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             self.assertEqual([['user_a', False], ['crate', True]], rs)
             self.assertEqual(['user_a', False], rs[0])
             self.assertEqual(['crate', True], rs[1])
+            cursor.execute('''
+                SELECT fact(100);
+            ''')
+            self.assertEqual(9900, cursor.fetchone()[0])
+            cursor.execute('''
+                SELECT class, grantee, ident, state, type
+                FROM sys.privileges
+                ORDER BY class, grantee, ident, state, type
+            ''')
+            
             self._process_on_stop()
