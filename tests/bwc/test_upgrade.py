@@ -192,7 +192,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
         VersionDef('6.0.0', []),
-        VersionDef('crate-6.2.0-2025-11-03-00-02-bc4b21d', []),
+        VersionDef('https://cdn.crate.io/downloads/releases/nightly/crate-6.2.0-2025-10-27-00-02-186b705.tar.gz', []),
     )
 
     def test_metadata_compatibility(self):
