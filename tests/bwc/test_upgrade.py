@@ -191,7 +191,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     SUPPORTED_VERSIONS = (
         VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
-        VersionDef('branch:jeeminso/temp-10', []),
+        VersionDef('branch:jeeminso/temp-8', []),
     )
 
     def test_metadata_compatibility(self):
@@ -260,5 +260,5 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                 FROM sys.privileges
                 ORDER BY class, grantee, ident, state, type
             ''')
-
+            
             self._process_on_stop()
