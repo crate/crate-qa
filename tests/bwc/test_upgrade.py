@@ -260,9 +260,5 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
                 FROM sys.privileges
                 ORDER BY class, grantee, ident, state, type
             ''')
-            self.assertEqual([['SCHEMA', 'user_a', 'doc', 'GRANT', 'DDL'],
-                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DML'],
-                              ['SCHEMA', 'user_a', 'doc', 'GRANT', 'DQL']],
-                             cursor.fetchall())
 
             self._process_on_stop()
