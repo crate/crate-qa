@@ -189,10 +189,9 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
+        VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
-        VersionDef('5.10.x', []),
-        VersionDef('6.0.x', []),
-        VersionDef('6.1.x', []),
+        VersionDef('branch:jeeminso/temp-10', []),
     )
 
     def test_metadata_compatibility(self):
