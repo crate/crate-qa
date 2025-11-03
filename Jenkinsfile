@@ -67,15 +67,13 @@ pipeline {
         }
         stage('Python bwc-upgrade tests') {
           agent { label 'medium && x64' }
-          tools { jdk 'jdk17' }
+          tools { jdk 'jdk11' }
           steps {
             checkout scm
             sh '''
               rm -rf env
               /usr/bin/python3.11 -m venv env
               source env/bin/activate
-              unset JAVA_TOOL_OPTIONS
-              unset JAVA_OPTS
               python -m pip install -U -e .
 
               (cd tests/bwc && python -m unittest -vvvf test_upgrade.py)
