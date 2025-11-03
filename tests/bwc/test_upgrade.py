@@ -192,7 +192,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
         VersionDef('2.3.x', []),
         VersionDef('3.3.x', []),
         VersionDef('6.0.0', []),
-        VersionDef('latest-nightly', []),
+        VersionDef('crate-6.2.0-2025-11-03-00-02-bc4b21d', []),
     )
 
     def test_metadata_compatibility(self):
