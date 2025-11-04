@@ -67,7 +67,7 @@ pipeline {
         }
         stage('Python bwc-upgrade tests') {
           agent { label 'medium && x64' }
-          tools { jdk 'jdk11' }
+          tools { jdk 'jdk17' }
           steps {
             checkout scm
             sh '''
