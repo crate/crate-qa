@@ -189,7 +189,6 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     }
 
     SUPPORTED_VERSIONS = (
-        VersionDef('3.3.x', []),
         VersionDef('6.0.0', []),
         VersionDef('https://cdn.crate.io/downloads/releases/nightly/crate-6.2.0-2025-10-28-00-02-31d7a23.tar.gz', []),
     )
