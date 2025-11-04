@@ -38,7 +38,7 @@ pipeline {
         }
         stage('Python bwc-rolling-upgrade tests 5-6') {
           agent { label 'medium && x64' }
-          tools { jdk 'jdk11' }
+          tools { jdk 'jdk17' }
           steps {
             checkout scm
             sh '''
@@ -67,7 +67,7 @@ pipeline {
         }
         stage('Python bwc-upgrade tests') {
           agent { label 'medium && x64' }
-          tools { jdk 'jdk11' }
+          tools { jdk 'jdk17' }
           steps {
             checkout scm
             sh '''
