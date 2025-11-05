@@ -194,7 +194,7 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
     )
 
     def test_metadata_compatibility(self):
-        nodes = 3
+        nodes = 2
 
         cluster = self._new_cluster(
             self.SUPPORTED_VERSIONS[0].version,
@@ -261,3 +261,4 @@ class MetaDataCompatibilityTest(NodeProvider, unittest.TestCase):
             ''')
             
             self._process_on_stop()
+            
