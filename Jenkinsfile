@@ -4,7 +4,7 @@
 pipeline {
   agent any
   options {
-    timeout(time: 4, unit: 'HOURS')
+    timeout(time: 5, unit: 'HOURS')
   }
   stages {
     stage('Parallel') {
