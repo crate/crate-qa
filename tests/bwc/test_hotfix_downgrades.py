@@ -41,6 +41,9 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
     def _run_downgrades(self, node):
         major, feature, hotfix = node.version
         for i in range(hotfix - 1, -1, -1):
+            # Skip downgrading to version 6.1.0 as it had OID serialization issues
+            if node.version == (6, 1, 1):
+                return
             new_version = (major, feature, i)
             with self.subTest(version=new_version):
                 node = self.upgrade_node(node, '.'.join(map(str, new_version)))
@@ -62,10 +65,6 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
         self._run_downgrades(node)
         cluster.stop()
 
-    @unittest.skip("""
-    This is expected to fail until CrateDB v6.1.1 is out
-    as 6.1.0 has issues with oid serialization.
-    """)
     def test_can_downgrade_unreleased_testing_branch_within_hotfix_versions(self):
         versions = fetch_versions()
         version = versions["testing"]["version"]
