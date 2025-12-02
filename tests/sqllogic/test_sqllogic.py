@@ -26,6 +26,7 @@ FILE_WHITELIST = [re.compile(o) for o in [
     r'select[1-5].test',
     r'random/select/slt_good_\d+.test',
     r'random/groupby/slt_good_\d+.test',
+    r'random/aggregates/slt_good_\d+.test',
     r'evidence/slt_lang_createview\.test',
     r'evidence/slt_lang_dropview\.test',
     r'custom/tableau.test'
