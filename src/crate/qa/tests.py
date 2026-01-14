@@ -11,7 +11,6 @@ from threading import Thread
 from typing import Dict, Any, NamedTuple, Iterable, List, Optional, Tuple
 
 from faker.generator import random
-from glob import glob
 from cr8.run_crate import CrateNode, get_crate, _extract_version, parse_version
 from cr8.insert_fake_data import SELLECT_COLS, Column, create_row_generator
 from cr8.insert_json import to_insert
@@ -22,12 +21,6 @@ CRATEDB_0_57 = (0, 57, 0)
 
 
 print_error = functools.partial(print, file=sys.stderr)
-
-
-JDK_8_JAVA_HOME_CANDIDATES = (
-    '/usr/lib/jvm/java-8-openjdk',
-    '/usr/lib/java-1.8.0',
-) + tuple(glob('/Library/Java/JavaVirtualMachines/jdk*1.8*/Contents/Home'))
 
 
 class UpgradePath(NamedTuple):
@@ -284,6 +277,7 @@ class NodeProvider:
             keep_data=True,
             settings=s,
             env=e,
+            java_magic=True,
         )
         setattr(n, "_settings", s)  # CrateNode does not hold its settings
         self._add_log_consumer(n)

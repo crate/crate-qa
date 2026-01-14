@@ -62,6 +62,8 @@ UPGRADE_PATHS = (
         VersionDef('6.0', []),
         VersionDef('6.1.x', []),
         VersionDef('6.1', []),
+        VersionDef('6.2.x', []),
+        VersionDef('6.2', []),
         VersionDef('latest-nightly', [])
     )
 )
