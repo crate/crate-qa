@@ -27,10 +27,10 @@ setup(
         'console_scripts': []
     },
     package_dir={'': 'src'},
-    packages=['crate.qa'],
+    packages=["crate", "crate.qa"],
     install_requires=[
         'crate>=1.0.0.dev2',
-        'cr8>=0.27.2',
+        'cr8 @ git+https://codeberg.org/mfussenegger/cr8.git@master',
         'Cython',
         'asyncpg>=0.21',
         'pyodbc',
