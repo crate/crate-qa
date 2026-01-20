@@ -13,12 +13,14 @@ pipeline {
           agent { label 'medium && x64' }
           steps {
             checkout scm
-            sh 'rm -rf env'
-            sh '/usr/bin/python3.11 -m venv env'
-            sh 'env/bin/python -m pip install -U mypy flake8'
-            sh 'find tests -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
-            sh 'find src -name "*.py" | xargs env/bin/mypy --ignore-missing-imports'
-            sh 'env/bin/flake8 src/ tests/'
+            sh '''
+              rm -rf .venv
+              uv venv --python 3.14
+              uv pip install mypy flake8
+              find tests -name "*.py" | xargs .venv/bin/mypy --ignore-missing-imports
+              find src -name "*.py" | xargs .venv/bin/mypy --ignore-missing-imports
+              .venv/bin/flake8 src/ tests/
+            '''
           }
         }
         stage('Python bwc-rolling-upgrade tests 4-5') {
@@ -27,9 +29,9 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              uv venv env
-              source env/bin/activate
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
               uv pip install -U -e .
 
               (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_4_to_5)
@@ -42,9 +44,9 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              uv venv env
-              source env/bin/activate
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
               uv pip install -U -e .
 
               (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_5_to_6)
@@ -56,10 +58,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               (cd tests/bwc && python -m unittest -vvvf test_hotfix_downgrades.py)
             '''
@@ -71,10 +73,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               (cd tests/bwc && python -m unittest -vvvf test_upgrade.py)
             '''
@@ -85,10 +87,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               (cd tests && python -m unittest discover -vvvf -s restart)
             '''
@@ -99,10 +101,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               (cd tests && python -m unittest discover -vvvf -s startup)
             '''
@@ -113,10 +115,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               git submodule update --init
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
@@ -128,10 +130,10 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf env
-              /usr/bin/python3.11 -m venv env
-              source env/bin/activate
-              python -m pip install -U -e .
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
 
               (cd tests && python -m unittest discover -vvvf -s client_tests)
             '''
