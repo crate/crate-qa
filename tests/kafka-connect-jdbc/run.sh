@@ -9,7 +9,7 @@ if [[ ${cratedb_image_id} ]] ; then
 	docker rmi ${cratedb_image_id}
 fi
 
-docker-compose up -d
+docker compose up -d
 
 echo "Wait until kafka-jdbc-connector is started up!"
 
@@ -42,9 +42,9 @@ fi
 
 if ! ./gradlew clean test --tests io.crate.qa.kafka.KafkaJdbcConnectorCrateDBIntegrationTest ; then
   echo "Failed executing kafka-jdbc-connector test"
-  docker-compose logs kafka-connect
+  docker compose logs kafka-connect
   exit_code=1
 fi
 
-docker-compose down
+docker compose down
 exit ${exit_code}
