@@ -16,13 +16,13 @@ def init_data(c):
         as 'function foo(x) { return 42 + x; }'
         """
     )
-    c.execute('CREATE TABLE tbl (x int)')
+    c.execute('CREATE TABLE tbl (x int) clustered into 2 shards')
     c.execute('INSERT INTO tbl (x) values (?)', (10,))
     c.execute("refresh table tbl")
     c.execute("create view v1 as (select * from tbl)")
     c.execute("create user arthur with (password = 'secret')")
     c.execute("grant dql to arthur")
-    c.execute("create table tparted (x int, y as foo(0), p int) partitioned by (p)")
+    c.execute("create table tparted (x int, y as foo(0), p int) clustered into 2 shards partitioned by (p)")
     c.execute("insert into tparted (x, p) values (1, 1)")
     c.execute("refresh table tparted")
 
@@ -50,7 +50,7 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
 
                 with connect(node.http_url, error_trace=True) as conn:
                     c = conn.cursor()
-                    wait_for_active_shards(c)
+                    wait_for_active_shards(c, 8)
                     c.execute('SELECT x FROM tbl')
                     xs = [row[0] for row in c.fetchall()]
                     self.assertEqual(xs, [10])
