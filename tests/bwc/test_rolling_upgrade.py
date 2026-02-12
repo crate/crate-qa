@@ -182,6 +182,43 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         wait_for_active_shards(c, current_shards)
         new_shards = 0
 
+        # Ensure table swaps work - the 4 swaps are equivalent to no swaps at all
+        if old_node.version >= (5, 6, 0):
+            c.execute("""
+                SELECT table_name, column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'doc' AND table_name IN ('parted', 't1', 't3')
+                ORDER BY 1, 2
+            """)
+            columns = c.fetchall()
+            c.execute("""
+                SELECT table_name, number_of_shards, number_of_replicas
+                FROM information_schema.tables
+                WHERE table_schema = 'doc' AND table_name IN ('parted', 't1', 't3')
+                ORDER BY 1
+            """)
+            tables = c.fetchall()
+
+            c.execute("alter cluster swap table doc.parted to doc.t1")
+            c.execute("alter cluster swap table doc.t1 to doc.t3")
+            c.execute("alter cluster swap table doc.t3 to doc.parted")
+            c.execute("alter cluster swap table doc.t3 to doc.t1")
+
+            c.execute("""
+                SELECT table_name, column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'doc' AND table_name IN ('parted', 't1', 't3')
+                ORDER BY 1, 2
+            """)
+            self.assertEqual(c.fetchall(), columns)
+            c.execute("""
+                SELECT table_name, number_of_shards, number_of_replicas
+                FROM information_schema.tables
+                WHERE table_schema = 'doc' AND table_name IN ('parted', 't1', 't3')
+                ORDER BY 1
+            """)
+            self.assertEqual(c.fetchall(), tables)
+
         c.execute("select name from sys.users order by 1")
         self.assertEqual(c.fetchall(), [["arthur"], ["crate"]])
 
