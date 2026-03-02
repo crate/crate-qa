@@ -22,6 +22,11 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close(ctx)
+
+	err = conn.Ping(ctx);
+	if err != nil {
+		log.Fatal(err)
+	}
 	var name string
 	err = conn.QueryRow(ctx, "select name || $1 from sys.cluster", "foo").Scan(&name)
 	if err != nil {
