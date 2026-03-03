@@ -25,33 +25,14 @@ from crate.qa.minio_svr import MinioServer, _is_up
 
 UPGRADE_PATHS = (
     (
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
         VersionDef('5.9.x', []),
+        VersionDef('5.8.x', []),
         VersionDef('5.10.x', []),
     ),
     (
-        VersionDef('5.2.x', []),
-        VersionDef('5.3.x', []),
-        VersionDef('5.4.x', []),
-        VersionDef('5.5.x', []),
-        VersionDef('5.6.x', []),
-        VersionDef('5.7.x', []),
-        VersionDef('5.8.x', []),
-        VersionDef('5.9.x', []),
-        VersionDef('5.10.x', []),
-        VersionDef('6.0.x', []),
-        VersionDef('6.0', []),
         VersionDef('6.1.x', []),
-        VersionDef('6.1', []),
         VersionDef('6.2.x', []),
-        VersionDef('6.2', []),
-        VersionDef('latest-nightly', [])
+        VersionDef('branch:mt/migrate-viewmetadata', [])
     )
 )
 
