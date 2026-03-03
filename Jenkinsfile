@@ -23,7 +23,7 @@ pipeline {
             '''
           }
         }
-        stage('Python bwc-rolling-upgrade tests 4-5') {
+        stage('Python bwc-rolling-upgrade tests 5-5') {
           agent { label 'medium && x64' }
           tools { jdk 'jdk11' }
           steps {
@@ -34,7 +34,7 @@ pipeline {
               source .venv/bin/activate
               uv pip install -U -e .
 
-              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_4_to_5)
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeTest.test_rolling_upgrade_5_to_5)
             '''
           }
         }
