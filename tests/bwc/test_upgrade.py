@@ -2,7 +2,7 @@ import os
 import shutil
 import threading
 import unittest
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import uuid4
 from typing import NamedTuple, Iterable, Tuple
 from io import BytesIO
@@ -192,7 +192,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         few simple selects work.
         """
         version_def = versions[0]
-        timestamp = datetime.utcnow().isoformat(timespec='seconds')
+        timestamp = datetime.now(UTC).isoformat(timespec='seconds')
         print(f"\n{timestamp} Start version: {version_def.version}")
         env = prepare_env(version_def.java_home)
         cluster = self._new_cluster(
@@ -259,7 +259,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         accumulated_dynamic_column_names: list[str] = []
         self._process_on_stop()
         for version_def in versions[1:]:
-            timestamp = datetime.utcnow().isoformat(timespec='seconds')
+            timestamp = datetime.now(UTC).isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
             self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
         # restart with latest version
