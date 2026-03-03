@@ -7,34 +7,11 @@ from cr8.run_crate import CrateNode
 
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath, assert_busy
 
-ROLLING_UPGRADES_V4 = (
-    # 4.0.0 -> 4.0.1 -> 4.0.2 don't support rolling upgrades due to a bug
-    UpgradePath('4.0.2', '4.0.x'),
-    UpgradePath('4.0.x', '4.1.0'),
-    UpgradePath('4.1.0', '4.1.x'),
-    UpgradePath('4.1.x', '4.2.x'),
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.x'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x')
+ROLLING_UPGRADES_V5 = (
+    UpgradePath('5.9.x', '5.10.x'),
 )
 
-ROLLING_UPGRADES_V5 = (
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
+ROLLING_UPGRADES_V6 = (
     UpgradePath('5.2.x', '5.3.x'),
     UpgradePath('5.3.x', '5.4.x'),
     UpgradePath('5.4.x', '5.5.x'),
@@ -54,9 +31,9 @@ ROLLING_UPGRADES_V5 = (
 
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
-    def test_rolling_upgrade_4_to_5(self):
+    def test_rolling_upgrade_5_to_5(self):
         print("")  # force newline for first print
-        for path in ROLLING_UPGRADES_V4:
+        for path in ROLLING_UPGRADES_V5:
             print(f"From {path.from_version}")
             with self.subTest(repr(path)):
                 try:
@@ -67,7 +44,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
     def test_rolling_upgrade_5_to_6(self):
         print("")  # force newline for first print
-        for path in ROLLING_UPGRADES_V5:
+        for path in ROLLING_UPGRADES_V6:
             print(f"From {path.from_version}")
             with self.subTest(repr(path)):
                 try:

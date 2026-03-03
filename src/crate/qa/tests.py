@@ -232,7 +232,10 @@ class NodeProvider:
         self._on_stop.remove(old_node)
         settings = getattr(old_node, "_settings", {})
         env = {}
-        if os.environ.get("DEBUGPY_RUNNING", "false") == "true":
+        crate_dir = get_crate(new_version)
+        version = _extract_version(crate_dir)
+        # 5,5 and 5,6 didn't bundle the jdwp module
+        if os.environ.get("DEBUGPY_RUNNING", "false") == "true" and (version < (5, 5, 0) or version >= (5, 7, 0)):
             jdwp = f"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address={port}"
             env["CRATE_JAVA_OPTS"] = jdwp
         (new_node, _) = self._new_node(new_version, settings=settings, env=env)
