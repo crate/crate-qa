@@ -30,7 +30,7 @@ setup(
     packages=["crate", "crate.qa"],
     install_requires=[
         'crate>=1.0.0.dev2',
-        'cr8 @ git+https://codeberg.org/mfussenegger/cr8.git@master',
+        'cr8>=0.29.1',
         'Cython',
         'asyncpg>=0.21',
         'pyodbc',
@@ -42,7 +42,7 @@ setup(
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.14',
     ],
     use_scm_version=True,
     setup_requires=['setuptools_scm']
