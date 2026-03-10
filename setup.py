@@ -29,7 +29,7 @@ setup(
     package_dir={'': 'src'},
     packages=["crate", "crate.qa"],
     install_requires=[
-        'crate @ git+https://github.com/crate/crate-python.git@main',
+        'crate>=2.1.2',
         'cr8>=0.29.1',
         'Cython',
         'asyncpg>=0.21',
@@ -37,7 +37,7 @@ setup(
         'psycopg2-binary>=2.7.5',
         'psycopg[binary,pool]',
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.13',
     classifiers=[
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',
