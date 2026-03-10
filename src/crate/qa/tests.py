@@ -8,6 +8,7 @@ import tempfile
 import functools
 from pprint import pformat
 from threading import Thread
+from collections.abc import Iterator
 from typing import Dict, Any, NamedTuple, Iterable, List, Optional, Tuple
 
 from faker.generator import random
@@ -147,13 +148,13 @@ class CrateCluster:
     def nodes(self) -> list[CrateNode]:
         return self._nodes
 
-    def __next__(self):
-        return next(self._nodes)
+    def __iter__(self) -> Iterator[CrateNode]:
+        return iter(self._nodes)
 
-    def __setitem__(self, idx, node):
+    def __setitem__(self, idx: int, node: CrateNode):
         self._nodes[idx] = node
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> CrateNode:
         return self._nodes[idx]
 
 
@@ -176,7 +177,7 @@ class NodeProvider:
                      version,
                      num_nodes: int,
                      data_paths: Optional[List[str]] = None,
-                     settings: Optional[Dict[str, str]] = None,
+                     settings: Optional[Dict[str, Any]] = None,
                      env=None,
                      explicit_discovery=True) -> CrateCluster:
         """ data_paths has 'num_nodes' elements and data_paths[i] stores path of the i-th node. 'None' if called first time."""
