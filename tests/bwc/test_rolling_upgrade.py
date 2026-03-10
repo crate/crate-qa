@@ -101,6 +101,11 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             print(f"    upgrade node {idx} to {path.to_version}")
             new_node = self.upgrade_node(node, path.to_version)
 
+            # Connect with crate user first and wait for shards to ensure recovery is finished
+            with connect(cluster.node().http_url, error_trace=True) as conn:
+                c = conn.cursor()
+                wait_for_active_shards(c)
+
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
                 c = custom_user_conn.cursor()
