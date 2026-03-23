@@ -1,0 +1,74 @@
+name: pgx
+
+on:
+  pull_request:
+    paths:
+    - '.github/workflows/pgx.yml'
+    - 'tests/client_tests/go/**'
+  push:
+    branches: [ main ]
+    paths:
+    - '.github/workflows/pgx.yml'
+    - 'tests/client_tests/go/**'
+  workflow_dispatch:
+  # Run job each night after CrateDB nightly has been published.
+  schedule:
+    - cron: '0 3 * * *'
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  test:
+    name: "
+     Go: ${{ matrix.go-version }}
+     CrateDB: ${{ matrix.cratedb-version }}
+     on ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-latest'
+        cratedb-version:
+          - 'nightly'
+        go-version:
+          - '1.25.x'
+          - '1.26.x'
+
+    services:
+      cratedb:
+        image: crate/crate:${{ matrix.cratedb-version }}
+        ports:
+          - 4200:4200
+          - 5432:5432
+        env:
+          CRATE_HEAP_SIZE: 4g
+
+    steps:
+
+      - name: Acquire sources
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Install project
+        run: |
+          cd tests/client_tests/go
+          go mod init cratedb.com/go-pgx-test/v2
+          go mod tidy
+
+      - name: Validate project
+        run: |
+          cd tests/client_tests/go
+          uvx crash < setup.sql
+          go run basic_queries.go --hosts localhost
+          go run bulk_operations.go --hosts localhost
