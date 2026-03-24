@@ -1,0 +1,63 @@
+name: pgx
+
+on:
+  pull_request:
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  test:
+    name: test pgx
+    runs-on: 'ubuntu-latest'
+
+    services:
+      cratedb:
+        image: crate/crate:nightly
+        ports:
+          - 4200:4200
+          - 5432:5432
+        env:
+          CRATE_HEAP_SIZE: 2g
+
+    steps:
+      - name: Acquire sources
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+
+      - name: Install project
+        run: |
+          cd tests/client_tests/go
+          go mod init cratedb.com/go-pgx-test/v2
+          go mod tidy
+
+      - name: Validate project
+        run: |
+          cd tests/client_tests/go
+          uvx crash < setup.sql
+          go run basic_queries.go --hosts localhost
+          go run bulk_operations.go --hosts localhost
+
+          # uvx cr8 run-crate latest-nightly -s cluster.name=debug -s path.logs=/tmp/c1_logs \
+          #   -- @uvx crash < setup.sql \
+          #   -- @go run basic_queries.go -hosts localhost -port {node.addresses.psql.port} \
+          #   -- @uvx crash -c "set global \"logger.io.crate.protocols.postgres.PostgresWireProtocol\" = 'TRACE'" \
+          #   -- @uvx crash -c "set global \"logger.io.crate.session.Sessions\" = 'TRACE'" \
+          #   -- @go run bulk_operations.go -hosts localhost -port {node.addresses.psql.port} \
+          #   -- @go run bulk_operations.go -hosts localhost -port {node.addresses.psql.port} \
+          #   -- @go run bulk_operations.go -hosts localhost -port {node.addresses.psql.port}
+
+      # - name: Show logs
+      #   if: always()
+      #   run: |
+      #     docker logs "${{ job.services.cratedb.id }}"
+          # cat /tmp/c1_logs/debug.log
