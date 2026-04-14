@@ -159,16 +159,6 @@ def get_test_paths():
             yield versions
 
 
-def path_repr(path: VersionDef) -> str:
-    """
-    String representation of the upgrade path in the format::
-
-        from_version -> to_version
-    """
-    versions = [v.version for v in path]
-    return f'{versions[0]} -> {versions[-1]}'
-
-
 class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
     CLUSTER_SETTINGS = {
@@ -258,15 +248,16 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
 
         accumulated_dynamic_column_names: list[str] = []
         self._process_on_stop()
-        for version_def in versions[1:]:
+        for idx, version_def in enumerate(versions[1:]):
             timestamp = datetime.now(UTC).isoformat(timespec='seconds')
             print(f"{timestamp} Upgrade to: {version_def.version}")
-            self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
+            self.assert_data_persistence(idx, version_def, nodes, digest, paths, accumulated_dynamic_column_names)
+
         # restart with latest version
-        version_def = versions[-1]
-        self.assert_data_persistence(version_def, nodes, digest, paths, accumulated_dynamic_column_names)
+        self.assert_data_persistence(idx, version_def, nodes, digest, paths, accumulated_dynamic_column_names)
 
     def assert_data_persistence(self,
+                                idx: int,
                                 version_def: VersionDef,
                                 nodes: int,
                                 digest: str,
@@ -283,7 +274,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
             version = version_def.version.replace(".", "_")
             cursor.execute(CREATE_DOC_TABLE.replace(
                 "CREATE TABLE t1 (",
-                f'CREATE TABLE IF NOT EXISTS versioned."t{version}" ('
+                f'CREATE TABLE IF NOT EXISTS versioned."t{idx}" ('
             ))
             cursor.execute('ALTER TABLE doc.t1 SET ("refresh_interval" = 4000)')
             run_selects(cursor, version_def.version)
