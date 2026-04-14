@@ -187,7 +187,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
         env = prepare_env(version_def.java_home)
         cluster = self._new_cluster(
             version_def.version, nodes, settings=self.CLUSTER_SETTINGS, env=env)
-        paths = [node._settings['path.data'] for node in cluster.nodes()]
+        paths = [node.data_path for node in cluster.nodes()]
         try:
             self._do_upgrade(cluster, nodes, paths, versions)
         except Exception as e:
@@ -217,7 +217,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
     def _do_upgrade(self,
                     cluster: CrateCluster,
                     nodes: int,
-                    paths: Iterable[str],
+                    paths: list[str],
                     versions: Tuple[VersionDef, ...]):
         cluster.start()
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -261,7 +261,7 @@ class StorageCompatibilityTest(NodeProvider, unittest.TestCase):
                                 version_def: VersionDef,
                                 nodes: int,
                                 digest: str,
-                                paths: Iterable[str],
+                                paths: list[str],
                                 accumulated_dynamic_column_names: list[str]):
         env = prepare_env(version_def.java_home)
         version = version_def.version
