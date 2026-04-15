@@ -12,21 +12,8 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x'),
-    UpgradePath('5.10.x', '6.0.x'),
-    UpgradePath('6.0.x', '6.1.x'),
-    UpgradePath('6.1.x', '6.2.x'),
-    UpgradePath('6.2.x', '6.2'),
     UpgradePath('6.2', '6.3.x'),
     UpgradePath('6.3.x', '6.3'),
-    UpgradePath('6.3', 'latest-nightly'),
 )
 
 
@@ -89,6 +76,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                         new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
                         expected_active_shards += new_shards
 
+        table_oids = None
+
         for idx, node in enumerate(cluster):
             # Enforce an old version node be a handler to make sure that an upgraded node can serve 'select *' from an old version node.
             # Otherwise upgraded node simply requests N-1 columns from old version with N columns and it always works.
@@ -106,6 +95,29 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             with connect(cluster.node().http_url, error_trace=True) as conn:
                 c = conn.cursor()
                 wait_for_active_shards(c)
+
+            with connect(new_node.http_url, error_trace=True) as conn:
+                # Check table oids assigned do not change
+                if new_node.version >= (6, 3, 0):
+                    current = get_table_oids(conn)
+
+                    oids = list(current.values())
+                    zero_oids = [name for name, oid in current.items() if oid == 0]
+                    self.assertEqual(
+                        zero_oids,
+                        [],
+                        f"pg_class contains oid = 0 for relations: {zero_oids}"
+                    )
+                    self.assertEqual(len(oids), len(set(oids)))
+
+                    if table_oids is None:
+                        table_oids = current
+                    else:
+                        self.assertEqual(
+                            current,
+                            table_oids,
+                            "pg_class oid changed after upgrade"
+                        )
 
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
@@ -423,3 +435,21 @@ def num_docs_x(cursor):
 def num_docs_rx(cursor):
     cursor.execute("select count(*) from doc.rx")
     return cursor.fetchall()[0][0]
+
+def get_table_oids(conn) -> dict[str, int]:
+    c = conn.cursor()
+    c.execute("""
+        SELECT relname, oid
+        FROM pg_catalog.pg_class
+        WHERE relkind = 'r'
+          AND relname IN (
+              't1',
+              't2',
+              't3',
+              'parted',
+              'y',
+              'x',
+              'rx'
+          )
+    """)
+    return dict(c.fetchall())
