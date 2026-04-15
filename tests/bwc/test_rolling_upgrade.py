@@ -12,7 +12,7 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('6.2', '6.3.x'),
+    UpgradePath('6.2', 'branch:jeeminso/upgrade-table-oid-6.3'),
     UpgradePath('6.3.x', '6.3'),
 )
 
