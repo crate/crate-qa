@@ -12,21 +12,7 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x'),
-    UpgradePath('5.10.x', '6.0.x'),
-    UpgradePath('6.0.x', '6.1.x'),
-    UpgradePath('6.1.x', '6.2.x'),
-    UpgradePath('6.2.x', '6.2'),
-    UpgradePath('6.2', '6.3.x'),
-    UpgradePath('6.3.x', '6.3'),
-    UpgradePath('6.3', 'latest-nightly'),
+    UpgradePath('6.2', 'branch:jeeminso/dont-assign-table-oids-when-not-fully-upgraded'),
 )
 
 
@@ -106,6 +92,34 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
             with connect(cluster.node().http_url, error_trace=True) as conn:
                 c = conn.cursor()
                 wait_for_active_shards(c)
+
+            if new_node.version >= (6, 3, 0):
+                with connect(new_node.http_url, error_trace=True) as conn:
+                    current_oids_dict = get_table_oids(conn)
+                    current_oids = list(current_oids_dict.values())
+
+                    if idx < nodes - 1:
+                        # Check that all table oids are UNASSIGNED during rolling uprade
+                        non_zero_tables = [name for name, oid in current_oids_dict.items() if oid != 0]
+                        self.assertEqual(
+                            non_zero_tables,
+                            [],
+                            f"OIDs should be 0 during rolling upgrade, but these tables have non-zero OIDs: {non_zero_tables}"
+                        )
+                    else:
+                        # Check that all table oids are updated by https://github.com/crate/crate/pull/18954 when
+                        # the rolling upgrade is completed
+                        num_tables = len(current_oids)
+
+                        out_of_range = {name: oid for name, oid in current_oids_dict.items() if not (1 <= oid <= num_tables)}
+                        self.assertEqual(
+                            out_of_range,
+                            {},
+                            f"The following tables have OIDs out of range [1, {num_tables}]: {out_of_range}"
+                        )
+
+                        # table oids must be unique
+                        self.assertEqual(len(set(current_oids)), num_tables)
 
             # Run a query as a user created on an older version (ensure user is read correctly from cluster state, auth works, etc)
             with connect(cluster.node().http_url, username='arthur', password='secret', error_trace=True) as custom_user_conn:
@@ -423,3 +437,21 @@ def num_docs_x(cursor):
 def num_docs_rx(cursor):
     cursor.execute("select count(*) from doc.rx")
     return cursor.fetchall()[0][0]
+
+def get_table_oids(conn) -> dict[str, int]:
+    c = conn.cursor()
+    c.execute("""
+        SELECT relname, oid
+        FROM pg_catalog.pg_class
+        WHERE relkind = 'r'
+          AND relname IN (
+              't1',
+              't2',
+              't3',
+              'parted',
+              'y',
+              'x',
+              'rx'
+          )
+    """)
+    return dict(c.fetchall())
