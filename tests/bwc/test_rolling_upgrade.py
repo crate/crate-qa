@@ -12,7 +12,7 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('6.2', 'branch:jeeminso/dont-assign-table-oids-when-not-fully-upgraded'),
+    UpgradePath('6.2', '6.3.x'),
 )
 
 
