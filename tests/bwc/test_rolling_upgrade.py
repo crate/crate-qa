@@ -1,9 +1,11 @@
+import threading
 import unittest
 from crate.client import connect
 from crate.client.cursor import Cursor
 from crate.client.connection import Connection
 from crate.client.exceptions import ProgrammingError
-from cr8.run_crate import CrateNode
+from cr8.run_crate import CrateNode, wait_until
+from crate.qa.minio_svr import MinioServer, _is_up
 
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath, assert_busy
 
@@ -53,6 +55,15 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     self._test_rolling_upgrade(path, nodes=3)
                 finally:
                     self.tearDown()
+
+    def test_oid_behavior_during_rolling_upgrade_6_2_to_6_3(self):
+        print("test_oid_behavior_during_rolling_upgrade_6_2_to_6_3")
+        path = UpgradePath('6.2', '6.3')
+        self.setUp()
+        try:
+            self._test_rolling_upgrade_with_oid_checks(path, nodes=3)
+        finally:
+            self.tearDown()
 
     def _test_rolling_upgrade(self, path: UpgradePath, nodes: int):
         """
@@ -268,6 +279,25 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         return new_shards
 
 
+def get_table_oids(conn) -> dict[str, int]:
+    c = conn.cursor()
+    c.execute("""
+        SELECT relname, oid
+        FROM pg_catalog.pg_class
+        WHERE relname IN (
+              't1',
+              't2',
+              't3',
+              'parted',
+              'y',
+              'remote_y',
+              'x',
+              'rx'
+          )
+    """)
+    return dict(c.fetchall())
+
+
 def init_data(conn: Connection, version: tuple[int, int, int], shards: int, replicas: int) -> int:
     new_shards = 0
     c = conn.cursor()
@@ -428,3 +458,160 @@ def num_docs_x(cursor):
 def num_docs_rx(cursor):
     cursor.execute("select count(*) from doc.rx")
     return cursor.fetchall()[0][0]
+
+
+class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.minio = MinioServer()
+        self.addCleanup(self.minio.close)
+        self.minio_thread = threading.Thread(target=self.minio.run, daemon=True)
+        self.minio_thread.start()
+        wait_until(lambda: _is_up('127.0.0.1', 9000))
+
+    def test_oid_behavior_during_rolling_upgrade_6_2_to_6_3(self):
+        print("test_oid_behavior_during_rolling_upgrade_6_2_to_6_3")
+        path = UpgradePath('6.2', '6.3')
+        self._test_rolling_upgrade_with_oid_checks(path, nodes=3)
+
+    def _test_rolling_upgrade_with_oid_checks(self, path, nodes):
+        shards = nodes
+        replicas = 1
+        expected_active_shards = 0
+        settings = {
+            'lang.js.enabled': 'true'
+        }
+
+        cluster = self._new_cluster(path.from_version, nodes, settings=settings)
+        cluster.start()
+        node = cluster.node()
+        with connect(node.http_url, error_trace=True) as conn:
+            new_shards = init_data(conn, node.version, shards, replicas)
+            expected_active_shards += new_shards
+            remote_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
+            remote_cluster.start()
+            remote_node = remote_cluster.node()
+            with connect(remote_node.http_url, error_trace=True) as remote_conn:
+                new_shards = init_foreign_data_wrapper_data(conn, remote_conn, node.addresses.psql.port, remote_node.addresses.psql.port)
+                expected_active_shards += new_shards
+                new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
+                expected_active_shards += new_shards
+
+        with connect(node.http_url, error_trace=True) as conn:
+            c = conn.cursor()
+            c.execute('CREATE TABLE s1(a1 INT)')
+            c.execute('INSERT INTO s1 VALUES(1)')
+            c.execute('''
+                CREATE REPOSITORY repo TYPE S3
+                WITH (access_key = 'minio', secret_key = 'miniostorage',
+                      bucket='backups', endpoint = '127.0.0.1:9000', protocol = 'http')
+            ''')
+            try:
+                c.execute('DROP SNAPSHOT repo.snapshot')
+            except ProgrammingError:
+                pass
+            c.execute('CREATE SNAPSHOT repo.snapshot TABLE doc.s1 WITH (wait_for_completion = true)')
+            c.execute('DROP TABLE s1')
+
+        cluster_nodes = list(cluster)
+        for idx, node in enumerate(cluster):
+            print(f"    upgrade node {idx} to {path.to_version}")
+            new_node = self.upgrade_node(node, path.to_version)
+            cluster_nodes[idx] = new_node
+
+            with connect(new_node.http_url, error_trace=True) as conn:
+                c = conn.cursor()
+                wait_for_active_shards(c)
+
+                test_snapshot_oids(self, cluster_nodes)
+                test_table_oids(self, cluster_nodes)
+
+
+def test_snapshot_oids(self, cluster):
+    expected_oid = -1439880087
+    is_master_on_6_3 = master_on_6_3(cluster)
+
+    for idx, node in enumerate(cluster):
+        with connect(node.http_url, error_trace=True) as conn:
+            c = conn.cursor()
+
+            restored_table_name = "s1"
+            c.execute("RESTORE SNAPSHOT repo.snapshot ALL WITH (wait_for_completion = true)")
+            c.execute("SELECT oid FROM pg_catalog.pg_class WHERE relname = ?", [restored_table_name])
+            restored_oid = c.fetchone()[0]
+
+            if node.version >= (6, 3, 0) and is_master_on_6_3:
+                self.assertTrue(
+                    restored_oid != 0 and restored_oid != expected_oid,
+                    f"When the master node and the current node is upgraded, restored table '{restored_table_name}' is expected to be assigned and diff from legacy OidHash but got '{restored_oid}'"
+                )
+            else:
+                self.assertEqual(
+                    restored_oid, expected_oid,
+                    f"When the master node or the current node is not upgraded, restored table '{restored_table_name}' is expected to return '{expected_oid}', but got '{restored_oid}'"
+                )
+
+            c.execute(f"DROP TABLE doc.{restored_table_name}")
+
+
+def test_table_oids(self, cluster):
+    # table oids generated by OidHash on 6.2 node
+    table_oid_hash = {
+        't1': 728874843,
+        't2': 1737494392,
+        't3': 923817332,
+        'parted': 759845467,
+        'y': 390511951,
+        'remote_y': -1197193175,
+        'x': 1317123279,
+        'rx': 2085238767,
+        'q0': -1068555959,
+        'q1': -1410726986,
+        'q2': 1473960846,
+    }
+
+    is_master_on_6_3 = master_on_6_3(cluster)
+
+    for idx, node in enumerate(cluster):
+        with connect(node.http_url, error_trace=True) as conn:
+            current_oids_dict = get_table_oids(conn)
+
+            # Test tables created before 6.3
+            for table_name, actual_oid in current_oids_dict.items():
+                expected_oid = table_oid_hash.get(table_name)
+                self.assertEqual(
+                    actual_oid, expected_oid,
+                    f"Table '{table_name}' created before 6.3 expected to return {expected_oid}, got {actual_oid}"
+                )
+
+            # Test tables created on 6.3
+            c = conn.cursor()
+            table_name = f"q{idx}"
+            c.execute(f"CREATE TABLE {table_name} (a int)")
+            c.execute("SELECT oid FROM pg_catalog.pg_class WHERE relname = ?", [table_name])
+            new_oid = c.fetchone()[0]
+
+            expected_oid = table_oid_hash.get(table_name)
+
+            if node.version >= (6, 3, 0) and is_master_on_6_3:
+                self.assertTrue(
+                    new_oid != 0 and new_oid != expected_oid,
+                    f"When the master node and the current node is upgraded, table '{table_name}' created on 6.3 is expected to be assigned and diff from legacy OidHash but got '{new_oid}'"
+                )
+            else:
+                self.assertEqual(
+                    new_oid, expected_oid,
+                    f"When the master node or the current node is not upgraded, table '{table_name}' created on 6.3 is expected to return '{expected_oid}', but got '{new_oid}'"
+                )
+
+            c.execute(f"DROP TABLE {table_name}")
+
+
+def master_on_6_3(cluster) -> bool:
+    with connect(cluster[0].http_url, error_trace=True) as conn:
+        c = conn.cursor()
+        c.execute("SELECT version['number'] FROM sys.nodes WHERE is_master = TRUE")
+        master_version_str = c.fetchone()[0]
+        master_version = tuple(map(int, master_version_str.split('.')))
+        return (6, 3, 0) <= master_version
