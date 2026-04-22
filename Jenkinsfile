@@ -53,6 +53,21 @@ pipeline {
             '''
           }
         }
+        stage('Python bwc-rolling-upgrade oid tests 6.2-6.3') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk17' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvv test_rolling_upgrade.RollingUpgradeOidTest.test_oid_behavior_during_rolling_upgrade_6_2_to_6_3)
+            '''
+          }
+        }
         stage('Python bwc-hotfix_downgrades tests') {
           agent { label 'medium && x64' }
           tools { jdk 'jdk17' }
