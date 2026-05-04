@@ -226,6 +226,11 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         self.assertEqual(res[0][0], {'dyn_empty_array': []})
         self.assertEqual(res[0][1], 'hello')
 
+        c.execute("select routine_name from information_schema.routines where routine_type = 'FUNCTION'")
+        self.assertEqual(c.fetchall(), [
+            ["foo"],
+        ])
+
         # Ensure that inserts are working while upgrading
         c.execute(
             "INSERT INTO doc.t1 (type, value, title, author) VALUES (3, 3, 'some title', {name='nothing to see, move on'})")
