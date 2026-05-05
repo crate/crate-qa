@@ -110,8 +110,16 @@ class Query:
             R -> Floating point result
             T -> Text result
 
-        sort-mode is either nosort or rowsort.
-        (There is also valuesort - but this is not yet implemented)
+        sort-mode is one of nosort, rowsort, valuesort, or rows.
+
+        With nosort, rowsort, and valuesort the result is flattened to a
+        single column (one value per line), as described below.
+
+        With "rows" the result keeps its original row/column shape: each
+        expected line in the test file represents one row, and columns are
+        separated by "| ". Use this when you want to assert
+        the exact ordering of columns as returned by the query (no sorting
+        is applied to the rows in this mode).
 
         label is optional and ignored.
 
@@ -165,13 +173,33 @@ class Query:
                     hash_=hash_,
                     filename=filename
                 )
-        self.format_result(self.result)
+        if self.sort == 'rows':
+            self.format_result_rows(self.result)
+        else:
+            self.format_result(self.result)
         return partial(
             validate_cmp_result,
             expected_rows=self.result,
             query=self.query,
             filename=filename
         )
+
+    def format_result_rows(self, lines):
+        """Parse each expected line as a row of columns separated by '| '.
+
+        Unlike `format_result`, this keeps the row/column structure
+        intact so each entry in ``lines`` becomes a list of typed column
+        values matching what the cursor returns from the database.
+        """
+        for i, line in enumerate(lines):
+            cols = line.split('| ')
+            for j, col in enumerate(cols):
+                if col == 'NULL':
+                    cols[j] = 'NULL'
+                    continue
+                fmt = self.result_formats[j % len(self.result_formats)]
+                cols[j] = self.format_value(col, fmt)
+            lines[i] = cols
 
     def format_result(self, rows):
         for i, row in enumerate(rows):
@@ -209,8 +237,9 @@ class Query:
         if self.sort == 'rowsort':
             rows = sorted(rows, key=lambda row: [str(c) for c in row])
 
-        # flatten the row values for comparison
-        rows = [col for row in rows for col in row]
+        if self.sort != 'rows':
+            # flatten the row values for comparison
+            rows = [col for row in rows for col in row]
 
         if self.sort == 'valuesort':
             rows = sorted(rows, key=lambda v: str(v))
