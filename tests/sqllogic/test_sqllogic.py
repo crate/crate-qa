@@ -17,6 +17,8 @@ project_root = dirname(dirname(here))
 
 tests_path = pathlib.Path(os.path.abspath(os.path.join(
     project_root, 'tests', 'sqllogic', 'testfiles', 'test')))
+integtests_path = pathlib.Path(os.path.abspath(os.path.join(
+    project_root, 'tests', 'sqllogic', 'integtests')))
 
 # Enable to be able to dump threads in case something gets stuck
 faulthandler.enable()
@@ -58,25 +60,36 @@ class SqlLogicTest(NodeProvider, unittest.TestCase):
         try:
             with ProcessPoolExecutor() as executor:
                 futures = []
-                for i, filename in enumerate(tests_path.glob('**/*.test')):
-                    filepath = tests_path / filename
-                    relpath = str(filepath.relative_to(tests_path))
-                    if not any(p.match(str(relpath)) for p in FILE_WHITELIST):
-                        continue
+                # The upstream sqllogic suite under testfiles/test is filtered
+                # by FILE_WHITELIST. tests under integtests/ are always run.
+                test_sources = [
+                    (tests_path, True),
+                    (integtests_path, False),
+                ]
+                i = 0
+                for path, apply_whitelist in test_sources:
+                    for filename in path.glob('**/*.test'):
+                        filepath = path / filename
+                        relpath = str(filepath.relative_to(path))
+                        if apply_whitelist and not any(
+                                p.match(str(relpath)) for p in FILE_WHITELIST):
+                            continue
 
-                    logfile = os.path.join(here, f'sqllogic-{os.path.basename(relpath)}-{i}.log')
-                    logfiles.append(logfile)
-                    future = executor.submit(
-                        run_file,
-                        filename=str(filepath),
-                        host='localhost',
-                        port=str(psql_addr.port),
-                        log_level=logging.WARNING,
-                        log_file=logfile,
-                        failfast=True,
-                        schema=f'x{i}'
-                    )
-                    futures.append(future)
+                        logfile = os.path.join(
+                            here, f'sqllogic-{os.path.basename(relpath)}-{i}.log')
+                        logfiles.append(logfile)
+                        future = executor.submit(
+                            run_file,
+                            filename=str(filepath),
+                            host='localhost',
+                            port=str(psql_addr.port),
+                            log_level=logging.WARNING,
+                            log_file=logfile,
+                            failfast=True,
+                            schema=f'x{i}'
+                        )
+                        futures.append(future)
+                        i += 1
                 for future in as_completed(futures):
                     future.result()
         finally:
