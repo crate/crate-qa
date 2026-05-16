@@ -497,6 +497,43 @@ def num_docs_rx(cursor):
     return cursor.fetchall()[0][0]
 
 
+class TemporaryUDFResolutionTest(NodeProvider, unittest.TestCase):
+    
+    def test_udf_resolution(self):
+        path = UpgradePath('6.2', 'latest-nightly')
+        self._test_udf_resolution(path, 9)
+        pass
+    
+    def _test_udf_resolution(self, path, nodes):
+        shards = nodes
+        replicas = 0
+        settings = {
+            'lang.js.enabled': 'true'
+        }
+        cluster = self._new_cluster(path.from_version, nodes, settings=settings)
+        cluster.start()
+        node = cluster.node()
+        with connect(node.http_url, error_trace=True) as conn:
+            init_data(conn, node.version, shards, replicas)
+
+        for idx, node in enumerate(cluster):
+            print(f"    upgrade node {idx} to {path.to_version}")
+            new_node = self.upgrade_node(node, path.to_version)
+
+            with connect(new_node.http_url, error_trace=True) as conn:
+                c = conn.cursor()
+                for i in range(1, 7):
+                    v = 7 ** idx + i
+                    c.execute(
+                        "INSERT INTO doc.parted (id, value) VALUES (?, ?)",
+                        [v, v],
+                    )
+                wait_for_active_shards(c)
+                c.execute("select distinct(count(*)) from doc.parted")
+                print(c.fetchall())
+                print("upgraded")
+        
+
 class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
 
     def setUp(self):
