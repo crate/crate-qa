@@ -31,8 +31,6 @@ QUERY_WHITELIST = [re.compile(o, re.IGNORECASE) for o in [
     'SELECT - SUM \\( col1 \\) \\* \\+ col1 FROM tab0 cor0 GROUP BY col1, col1',
 ]]
 
-varchar_to_string = partial(re.compile(r'VARCHAR\(\d+\)').sub, 'STRING')
-
 
 class IncorrectResult(BaseException):
     pass
@@ -54,9 +52,8 @@ class Statement:
         self.query = '\n'.join(cmd[1:])
 
     def execute(self, cursor):
-        stmt = varchar_to_string(self.query)
         try:
-            cursor.execute(stmt)
+            cursor.execute(self.query)
         except psycopg2.Error as e:
             if self.expect_ok:
                 raise IncorrectResult(e)
