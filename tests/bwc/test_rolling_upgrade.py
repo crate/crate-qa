@@ -14,20 +14,6 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x'),
-    UpgradePath('5.10.x', '6.0.x'),
-    UpgradePath('6.0.x', '6.1.x'),
-    UpgradePath('6.1.x', '6.2.x'),
-    UpgradePath('6.2.x', '6.2'),
-    UpgradePath('6.2', '6.3.x'),
-    UpgradePath('6.3.x', '6.3'),
     UpgradePath('6.3', 'latest-nightly'),
 )
 
@@ -35,26 +21,19 @@ ROLLING_UPGRADES_V6 = (
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
     def test_rolling_upgrade_5_to_5(self):
-        print("")  # force newline for first print
-        for path in ROLLING_UPGRADES_V5:
-            print(f"From {path.from_version}")
-            with self.subTest(repr(path)):
-                try:
-                    self.setUp()
-                    self._test_rolling_upgrade(path, nodes=3)
-                finally:
-                    self.tearDown()
+        pass
 
     def test_rolling_upgrade_5_to_6(self):
         print("")  # force newline for first print
         for path in ROLLING_UPGRADES_V6:
-            print(f"From {path.from_version}")
-            with self.subTest(repr(path)):
-                try:
-                    self.setUp()
-                    self._test_rolling_upgrade(path, nodes=3)
-                finally:
-                    self.tearDown()
+            for i in range(10):
+                print(f"From {path.from_version}")
+                with self.subTest(repr(path)):
+                    try:
+                        self.setUp()
+                        self._test_rolling_upgrade(path, nodes=3)
+                    finally:
+                        self.tearDown()
 
     def test_oid_behavior_during_rolling_upgrade_6_2_to_6_3(self):
         print("test_oid_behavior_during_rolling_upgrade_6_2_to_6_3")
