@@ -26,7 +26,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
     def test_rolling_upgrade_5_to_6(self):
         print("")  # force newline for first print
         for path in ROLLING_UPGRADES_V6:
-            for i in range(10):
+            for i in range(30):
                 print(f"From {path.from_version}")
                 with self.subTest(repr(path)):
                     try:
