@@ -14,7 +14,7 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('6.3', 'latest-nightly'),
+    UpgradePath('6.0.x', '6.1.x'),
 )
 
 
