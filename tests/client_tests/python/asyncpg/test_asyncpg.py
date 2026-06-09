@@ -23,6 +23,7 @@ option which goes along like this::
 import os
 import asyncpg
 import unittest
+from datetime import date
 from crate.qa.tests import NodeProvider
 
 
@@ -94,12 +95,23 @@ async def fetch_summits(test, uri):
     await conn.close()
 
 
+async def test_date_encoding(test: unittest.IsolatedAsyncioTestCase, conn: asyncpg.Connection):
+    d = date(2026, 6, 8)
+    result = await conn.fetch("select '2026-06-08'::date")
+    test.assertEqual(result[0][0], d)
+
+    stmt = await conn.prepare("select $1::date")
+    result = await stmt.fetch(d)
+    test.assertEqual(result[0][0], d)
+
+
 async def exec_queries_pooled(test, uri):
     pool = await asyncpg.create_pool(uri)
     async with pool.acquire() as conn:
         await basic_queries(test, conn)
         await record_type_can_be_read_using_binary_streaming(test, conn)
         await bitstring_can_be_inserted_and_selected_using_binary_encoding(test, conn)
+        await test_date_encoding(test, conn)
     await pool.close()
 
 
