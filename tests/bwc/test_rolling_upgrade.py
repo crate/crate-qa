@@ -48,8 +48,9 @@ ROLLING_UPGRADES_V6 = (
 def run_sqllogic_tests(node, schema_prefix='bwc', mode=RunMode.ALL):
     """Run sqllogic integtests against the given node's PostgreSQL endpoint."""
     psql_port = str(node.addresses.psql.port)
+    numShards = 0
     for i, test_file in enumerate(sorted(_integtests_path.glob('**/*.test'))):
-        _run_sqllogic_file(
+        numShards += _run_sqllogic_file(
             filename=str(test_file),
             host='localhost',
             port=psql_port,
@@ -59,6 +60,7 @@ def run_sqllogic_tests(node, schema_prefix='bwc', mode=RunMode.ALL):
             schema=f'{schema_prefix}{i}',
             mode=mode,
         )
+    return numShards
 
 
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
@@ -367,7 +369,6 @@ def get_table_oids(conn) -> dict[str, int]:
 
 
 def init_data(conn: Connection, version: tuple[int, int, int], shards: int, replicas: int) -> int:
-    new_shards = 0
     c = conn.cursor()
     c.execute("create user arthur with (password = 'secret')")
     c.execute("grant dql to arthur")
@@ -556,8 +557,7 @@ class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
         node = cluster.node()
         with connect(node.http_url, error_trace=True) as conn:
             new_shards = init_data(conn, node.version, shards, replicas)
-            run_sqllogic_tests(node, schema_prefix='bwc_sqllogic', mode=RunMode.STATEMENTS_ONLY)
-            new_shards += 1
+            new_shards += run_sqllogic_tests(node, schema_prefix='bwc_sqllogic', mode=RunMode.STATEMENTS_ONLY)
             expected_active_shards += new_shards
             remote_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
             remote_cluster.start()

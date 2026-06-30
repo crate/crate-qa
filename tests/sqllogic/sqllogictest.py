@@ -371,6 +371,8 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=R
     if os.environ.get('TQDM_ENABLED', 'True').lower() == 'true':
         commands = tqdm(commands)
     dml_done = False
+    cursor.execute('SELECT count(*) FROM sys.shards WHERE schema_name = %s', (schema,))
+    shards_before = cursor.fetchone()[0]
     attr = dict(testfile=fh.name)
     try:
         for cmd in commands:
@@ -397,9 +399,12 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=R
                 logger.warn('%s; %s', s_or_q.query, e, extra=attr)
     finally:
         fh.close()
+        cursor.execute('SELECT count(*) FROM sys.shards WHERE schema_name = %s', (schema,))
+        shards_after = cursor.fetchone()[0]
         _drop_relations(cursor, schema)
         cursor.close()
         conn.close()
+    return shards_after - shards_before
 
 
 def main():
