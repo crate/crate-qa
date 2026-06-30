@@ -1,3 +1,7 @@
+import logging
+import os
+import pathlib
+import sys
 import threading
 import unittest
 from crate.client import connect
@@ -8,6 +12,15 @@ from cr8.run_crate import CrateNode, wait_until
 from crate.qa.minio_svr import MinioServer, _is_up
 
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath, assert_busy
+
+# Make the sqllogic package importable from tests/bwc/
+_tests_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if _tests_dir not in sys.path:
+    sys.path.insert(0, _tests_dir)
+
+from sqllogic.sqllogictest import run_file as _run_sqllogic_file
+
+_integtests_path = pathlib.Path(_tests_dir + '/sqllogic/integtests')
 
 ROLLING_UPGRADES_V5 = (
     UpgradePath('5.9.x', '5.10.x'),
@@ -31,6 +44,20 @@ ROLLING_UPGRADES_V6 = (
     UpgradePath('6.3', 'latest-nightly'),
 )
 
+
+def run_sqllogic_tests(node, schema_prefix='bwc'):
+    """Run sqllogic integtests against the given node's PostgreSQL endpoint."""
+    psql_port = str(node.addresses.psql.port)
+    for i, test_file in enumerate(sorted(_integtests_path.glob('**/*.test'))):
+        _run_sqllogic_file(
+            filename=str(test_file),
+            host='localhost',
+            port=psql_port,
+            log_level=logging.WARNING,
+            log_file=None,
+            failfast=True,
+            schema=f'{schema_prefix}{i}',
+        )
 
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
@@ -141,6 +168,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                         if node.version >= (5, 10, 0):
                             test_logical_replication_queries(self, conn, remote_conn)
 
+
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -175,6 +203,8 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                                   current_shards: int) -> int:
         wait_for_active_shards(c, current_shards)
         new_shards = 0
+
+        run_sqllogic_tests(new_node, schema_prefix=f'bwc{idx}')
 
         # Ensure table swaps work - the 4 swaps are equivalent to no swaps at all
         if old_node.version >= (5, 6, 0):
