@@ -18,7 +18,7 @@ _tests_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if _tests_dir not in sys.path:
     sys.path.insert(0, _tests_dir)
 
-from sqllogic.sqllogictest import run_file as _run_sqllogic_file
+from sqllogic.sqllogictest import run_file as _run_sqllogic_file, RunMode
 
 _integtests_path = pathlib.Path(_tests_dir + '/sqllogic/integtests')
 
@@ -45,7 +45,7 @@ ROLLING_UPGRADES_V6 = (
 )
 
 
-def run_sqllogic_tests(node, schema_prefix='bwc'):
+def run_sqllogic_tests(node, schema_prefix='bwc', mode=RunMode.ALL):
     """Run sqllogic integtests against the given node's PostgreSQL endpoint."""
     psql_port = str(node.addresses.psql.port)
     for i, test_file in enumerate(sorted(_integtests_path.glob('**/*.test'))):
@@ -57,7 +57,9 @@ def run_sqllogic_tests(node, schema_prefix='bwc'):
             log_file=None,
             failfast=True,
             schema=f'{schema_prefix}{i}',
+            mode=mode,
         )
+
 
 class RollingUpgradeTest(NodeProvider, unittest.TestCase):
 
@@ -168,7 +170,6 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                         if node.version >= (5, 10, 0):
                             test_logical_replication_queries(self, conn, remote_conn)
 
-
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
         with connect(cluster.node().http_url, error_trace=True) as conn:
@@ -204,7 +205,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         wait_for_active_shards(c, current_shards)
         new_shards = 0
 
-        run_sqllogic_tests(new_node, schema_prefix=f'bwc{idx}')
+        run_sqllogic_tests(new_node, schema_prefix='bwc_sqllogic', mode=RunMode.QUERIES_ONLY)
 
         # Ensure table swaps work - the 4 swaps are equivalent to no swaps at all
         if old_node.version >= (5, 6, 0):
@@ -555,6 +556,8 @@ class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
         node = cluster.node()
         with connect(node.http_url, error_trace=True) as conn:
             new_shards = init_data(conn, node.version, shards, replicas)
+            run_sqllogic_tests(node, schema_prefix='bwc_sqllogic', mode=RunMode.STATEMENTS_ONLY)
+            new_shards += 1
             expected_active_shards += new_shards
             remote_cluster = self._new_cluster(path.from_version, 1, settings=settings, explicit_discovery=False)
             remote_cluster.start()
