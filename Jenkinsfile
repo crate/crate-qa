@@ -141,6 +141,20 @@ pipeline {
             '''
           }
         }
+        stage('Python mixed-cluster sqllogic tests') {
+          agent { label 'medium && x64' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
+
+              (cd tests && python -m unittest sqllogic/test_sqllogic_mixed_cluster.py)
+            '''
+          }
+        }
         stage('Python client tests') {
           agent { label 'medium && x64' }
           steps {
