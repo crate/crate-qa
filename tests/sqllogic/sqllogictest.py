@@ -194,7 +194,7 @@ class Query:
                 if col == 'NULL':
                     cols[j] = 'NULL'
                     continue
-                fmt = self.result_formats[j % len(self.result_formats)]
+                fmt = self.result_formats[j]
                 cols[j] = self.format_value(col, fmt)
             lines[i] = cols
 
