@@ -346,7 +346,21 @@ def get_logger(level, filename=None):
     return logger
 
 
-def run_file(filename, host, port, log_level, log_file, failfast, schema):
+class RunMode:
+    ALL = 'all'
+    STATEMENTS_ONLY = 'statements_only'
+    QUERIES_ONLY = 'queries_only'
+
+
+def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=RunMode.ALL):
+    """Run a sqllogic test file.
+
+    mode controls which commands are executed:
+      RunMode.ALL              - run both statements and queries (default)
+      RunMode.STATEMENTS_ONLY - skip Query commands, only execute Statements
+      RunMode.QUERIES_ONLY    - skip Statement commands, only execute Queries
+                                (tables must already exist)
+    """
     logger = get_logger(log_level, log_file)
     conn = psycopg2.connect(
         f'host={host} port={port} user=crate dbname={schema}')
@@ -357,10 +371,16 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema):
     if os.environ.get('TQDM_ENABLED', 'True').lower() == 'true':
         commands = tqdm(commands)
     dml_done = False
+    cursor.execute('SELECT count(*) FROM sys.shards WHERE schema_name = %s', (schema,))
+    shards_before = cursor.fetchone()[0]
     attr = dict(testfile=fh.name)
     try:
         for cmd in commands:
             s_or_q = parse_cmd(cmd, filename)
+            if isinstance(s_or_q, Statement) and mode == RunMode.QUERIES_ONLY:
+                continue
+            if isinstance(s_or_q, Query) and mode == RunMode.STATEMENTS_ONLY:
+                continue
             if not dml_done and isinstance(s_or_q, Query):
                 dml_done = True
                 _refresh_tables(cursor, schema)
@@ -379,9 +399,12 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema):
                 logger.warn('%s; %s', s_or_q.query, e, extra=attr)
     finally:
         fh.close()
+        cursor.execute('SELECT count(*) FROM sys.shards WHERE schema_name = %s', (schema,))
+        shards_after = cursor.fetchone()[0]
         _drop_relations(cursor, schema)
         cursor.close()
         conn.close()
+    return shards_after - shards_before
 
 
 def main():
@@ -398,6 +421,10 @@ def main():
     parser.add_argument('--failfast',
                         action='store_true', default=False,
                         help='Fail on first error.')
+    parser.add_argument('--mode',
+                        choices=[RunMode.ALL, RunMode.STATEMENTS_ONLY, RunMode.QUERIES_ONLY],
+                        default=RunMode.ALL,
+                        help='Which commands to execute: all (default), statements_only, or queries_only.')
     args = parser.parse_args()
     run_file(
         args.file,
@@ -406,7 +433,8 @@ def main():
         args.log_level,
         None,
         args.failfast,
-        'doc'
+        'doc',
+        args.mode,
     )
 
 
