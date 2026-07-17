@@ -332,7 +332,29 @@ def get_table_oids(conn) -> dict[str, int]:
               'rx'
           )
     """)
-    return dict(c.fetchall())
+    pg_class_oids = dict(c.fetchall())
+
+    c.execute("""
+        SELECT *
+        FROM (
+            VALUES
+                ('t1', 'doc.t1'::regclass),
+                ('t2', 'doc.t2'::regclass),
+                ('t3', 'doc.t3'::regclass),
+                ('parted', 'doc.parted'::regclass),
+                ('y', 'doc.y'::regclass),
+                ('remote_y', 'doc.remote_y'::regclass),
+                ('x', 'doc.x'::regclass),
+                ('rx', 'doc.rx'::regclass)
+        ) AS oids(relname, oid)
+    """)
+    regclass_oids = dict(c.fetchall())
+
+    assert pg_class_oids == regclass_oids, (
+        f"pg_class OIDs differ from regclass OIDs: "
+        f"pg_class={pg_class_oids}, regclass={regclass_oids}"
+    )
+    return pg_class_oids
 
 
 def init_data(conn: Connection, version: tuple[int, int, int], shards: int, replicas: int) -> int:
@@ -612,6 +634,7 @@ def test_table_oids(self, cluster):
 
     for idx, node in enumerate(cluster):
         with connect(node.http_url, error_trace=True) as conn:
+            c = conn.cursor()
             current_oids_dict = get_table_oids(conn)
 
             # Test tables created before 6.3
@@ -621,9 +644,13 @@ def test_table_oids(self, cluster):
                     actual_oid, expected_oid,
                     f"Table '{table_name}' created before 6.3 expected to return {expected_oid}, got {actual_oid}"
                 )
+                c.execute("SELECT pg_table_is_visible(?)", [actual_oid])
+                self.assertTrue(
+                    c.fetchone()[0],
+                    f"Table '{table_name}' created before 6.3 expected to be visible with OID {actual_oid}"
+                )
 
             # Test tables created on 6.3
-            c = conn.cursor()
             table_name = f"q{idx}"
             c.execute(f"CREATE TABLE {table_name} (a int)")
             c.execute("SELECT oid FROM pg_catalog.pg_class WHERE relname = ?", [table_name])
