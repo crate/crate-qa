@@ -23,10 +23,10 @@ pipeline {
 
               rm -rf crate_src
               git clone https://github.com/crate/crate.git crate_src
-              (cd crate_src && git checkout 5eec0d54738adcdbb637eba5566b6ffbd16db272)
+              (cd crate_src && git checkout 66968985546409028599c02f277c7dda48d779a5)
 
               export CRATE_VERSION=$(pwd)/crate_src
-              export CRATE_HEAP_SIZE=1200m
+              # export CRATE_HEAP_SIZE=1200m
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
             '''
           }
