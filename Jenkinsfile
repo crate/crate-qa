@@ -20,7 +20,7 @@ pipeline {
               uv pip install -U -e .
 
               git submodule update --init
-              export CRATE_VERSION=6.4.4
+              export CRATE_VERSION=6.4
               # export CRATE_HEAP_SIZE=1200m
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
             '''
