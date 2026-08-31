@@ -20,13 +20,8 @@ pipeline {
               uv pip install -U -e .
 
               git submodule update --init
-
-              rm -rf crate_src
-              git clone https://github.com/crate/crate.git crate_src
-              (cd crate_src && git checkout 8d49e51)
-
-              export CRATE_VERSION=$(pwd)/crate_src
-              export CRATE_HEAP_SIZE=1200m
+              export CRATE_VERSION=6.4.4
+              # export CRATE_HEAP_SIZE=1200m
               (cd tests && python -m unittest discover -vvvf -s sqllogic)
             '''
           }
