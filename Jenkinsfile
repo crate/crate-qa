@@ -23,7 +23,7 @@ pipeline {
 
               rm -rf crate_src
               git clone https://github.com/crate/crate.git crate_src
-              (cd crate_src && git checkout 106f9174737bc66bf9f71149526b5c94bd18b84b)
+              (cd crate_src && git checkout bc9a97017790e388482a20fd4eb19884b3facff6)
 
               export CRATE_VERSION=$(pwd)/crate_src
               # export CRATE_HEAP_SIZE=1200m
