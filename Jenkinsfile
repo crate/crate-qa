@@ -27,7 +27,9 @@ pipeline {
 
               export CRATE_VERSION=$(pwd)/crate_src
               # export CRATE_HEAP_SIZE=2750m
-              (cd tests && python -m unittest discover -vvvf -s sqllogic)
+              for i in $(seq 1 10); do
+                (cd tests && python -m unittest discover -vvvf -s sqllogic)
+              done
             '''
           }
         }
