@@ -14,10 +14,7 @@ pipeline {
           steps {
             checkout scm
             sh '''
-              rm -rf .venv
-              uv venv --python 3.14
-              source .venv/bin/activate
-              uv pip install -U -e .
+              set +e
 
               git submodule update --init
 
@@ -27,9 +24,29 @@ pipeline {
 
               export CRATE_VERSION=$(pwd)/crate_src
               # export CRATE_HEAP_SIZE=2750m
+
+              overall_status=0
+
               for i in $(seq 1 10); do
+                echo "=== Run $i ==="
+
+                rm -rf .venv
+                uv venv --python 3.14
+                source .venv/bin/activate
+                uv pip install -U -e .
+
                 (cd tests && python -m unittest discover -vvvf -s sqllogic)
+                run_status=$?
+                if [ "$run_status" -ne 0 ]; then
+                  echo "Run $i failed with status $run_status"
+                  overall_status=1
+                fi
+
+                deactivate
+                rm -rf .venv
               done
+
+              exit $overall_status
             '''
           }
         }
