@@ -490,24 +490,36 @@ def init_logical_replication_data(self, local_conn: Connection, remote_conn: Con
 
 
 def test_logical_replication_queries(self, local_conn: Connection, remote_conn: Connection):
-    c = local_conn.cursor()
+    lc = local_conn.cursor()
     rc = remote_conn.cursor()
 
     # Cannot drop replicated tables
     with self.assertRaises(ProgrammingError):
         rc.execute("drop table doc.x")
-        c.execute("drop table doc.rx")
+        lc.execute("drop table doc.rx")
 
     count = num_docs_x(rc)
-    count2 = num_docs_rx(c)
+    count2 = num_docs_rx(lc)
 
-    c.execute("insert into doc.x values (1)")
-    c.execute("refresh table doc.x")
-    rc.execute("insert into doc.rx values (1)")
+    rc.execute(f"alter table doc.rx add column new{count} int")
+
+    lc.execute("insert into doc.x (a) values (1)")
+    lc.execute("refresh table doc.x")
+    rc.execute("insert into doc.rx (a) values (1)")
     rc.execute("refresh table doc.rx")
 
     assert_busy(lambda: self.assertEqual(num_docs_x(rc), count + 1))
-    assert_busy(lambda: self.assertEqual(num_docs_rx(c), count2 + 1))
+    assert_busy(lambda: self.assertEqual(num_docs_rx(lc), count2 + 1))
+
+    def query_new_column():
+        try:
+            lc.execute(f"select new{count} from doc.rx")
+        except ProgrammingError as e:
+            # ProgrammingError is raised if column addition is not yet replicated
+            # raise as AssertionError for assert_busy to retry
+            raise AssertionError(str(e))
+
+    assert_busy(query_new_column)
 
 
 def num_docs_x(cursor):
