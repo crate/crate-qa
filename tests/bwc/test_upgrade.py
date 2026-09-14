@@ -21,7 +21,7 @@ from crate.qa.tests import (
     prepare_env, timeout, assert_busy,
 )
 
-from crate.qa.minio_svr import MinioServer, _is_up
+from crate.qa.silo_svr import SiloServer, _is_up
 
 UPGRADE_PATHS = (
     (
@@ -488,8 +488,8 @@ class SnapshotCompatibilityTest(NodeProvider, unittest.TestCase):
 
     CREATE_REPOSITORY = '''
 CREATE REPOSITORY r1 TYPE S3
-WITH (access_key = 'minio',
-secret_key = 'miniostorage',
+WITH (access_key = 'silo',
+secret_key = 'silostorage',
 bucket='backups',
 endpoint = '127.0.0.1:9000',
 protocol = 'http')
@@ -506,14 +506,14 @@ protocol = 'http')
     def test_snapshot_compatibility(self):
         """Test snapshot compatibility when upgrading 5.0.x -> latest-nightly
 
-        Using Minio as a S3 repository, the first cluster that runs
+        Using Silo as a S3 repository, the first cluster that runs
         creates the repo, a table and inserts/selects some data, which
         then is snapshotted and deleted. The next cluster recovers the
         data from the last snapshot, performs further inserts/selects,
         to then snapshot the data and delete it.
         """
-        with MinioServer() as minio:
-            t = threading.Thread(target=minio.run)
+        with SiloServer() as silo:
+            t = threading.Thread(target=silo.run)
             t.daemon = True
             t.start()
             wait_until(lambda: _is_up('127.0.0.1', 9000))

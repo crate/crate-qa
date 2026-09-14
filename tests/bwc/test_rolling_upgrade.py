@@ -5,7 +5,7 @@ from crate.client.cursor import Cursor
 from crate.client.connection import Connection
 from crate.client.exceptions import ProgrammingError
 from cr8.run_crate import CrateNode, wait_until
-from crate.qa.minio_svr import MinioServer, _is_up
+from crate.qa.silo_svr import SiloServer, _is_up
 
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath, assert_busy
 
@@ -524,10 +524,10 @@ class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        self.minio = MinioServer()
-        self.addCleanup(self.minio.close)
-        self.minio_thread = threading.Thread(target=self.minio.run, daemon=True)
-        self.minio_thread.start()
+        self.silo = SiloServer()
+        self.addCleanup(self.silo.close)
+        self.silo_thread = threading.Thread(target=self.silo.run, daemon=True)
+        self.silo_thread.start()
         wait_until(lambda: _is_up('127.0.0.1', 9000))
 
     def test_oid_behavior_during_rolling_upgrade_6_2_to_6_3(self):
@@ -564,7 +564,7 @@ class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
             c.execute('INSERT INTO s1 VALUES(1)')
             c.execute('''
                 CREATE REPOSITORY repo TYPE S3
-                WITH (access_key = 'minio', secret_key = 'miniostorage',
+                WITH (access_key = 'silo', secret_key = 'silostorage',
                       bucket='backups', endpoint = '127.0.0.1:9000', protocol = 'http')
             ''')
             try:

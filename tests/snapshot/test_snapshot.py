@@ -5,7 +5,7 @@ import unittest
 from cr8.run_crate import wait_until
 from crate.client import connect
 from crate.client.exceptions import ProgrammingError
-from crate.qa.minio_svr import MinioServer, _is_up
+from crate.qa.silo_svr import SiloServer, _is_up
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, gen_id, assert_busy
 
 
@@ -22,12 +22,12 @@ class SnapshotOperationTest(NodeProvider, unittest.TestCase):
            snapshots in parallel.
 
         The purpose of this test is to validate that the snapshot mechanism
-        of CrateDB can handle the two operations in parallel. Here, Minio is
+        of CrateDB can handle the two operations in parallel. Here, Silo is
         used as s3 backend for the repository, but this should work on any
         other backend as well.
         """
-        with MinioServer() as minio:
-            t = threading.Thread(target=minio.run)
+        with SiloServer() as silo:
+            t = threading.Thread(target=silo.run)
             t.daemon = True
             t.start()
             wait_until(lambda: _is_up('127.0.0.1', 9000))
@@ -54,8 +54,8 @@ class SnapshotOperationTest(NodeProvider, unittest.TestCase):
 
                 c.execute('''
                             CREATE REPOSITORY repo TYPE S3
-                            WITH (access_key = 'minio',
-                            secret_key = 'miniostorage',
+                            WITH (access_key = 'silo',
+                            secret_key = 'silostorage',
                             bucket='backups',
                             endpoint = '127.0.0.1:9000',
                             protocol = 'http')
