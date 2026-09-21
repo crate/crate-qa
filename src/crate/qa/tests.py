@@ -7,7 +7,7 @@ import string
 import tempfile
 import functools
 from pprint import pformat
-from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Iterator
 from typing import Dict, Any, NamedTuple, Iterable, List, Optional, Tuple
 
@@ -60,9 +60,23 @@ def remove_unsupported_settings(version: Tuple[int, int, int], settings: dict) -
     new_settings = dict(settings)
     if version >= (4, 0, 0):
         new_settings.pop('license.enterprise', None)
+        new_settings.pop("discovery.zen.minimum_master_nodes", None)
+        unicast_hosts = new_settings.pop("discovery.zen.ping.unicast.hosts", None)
+        if unicast_hosts:
+            new_settings.setdefault("discovery.seed_hosts", unicast_hosts)
     else:
-        new_settings.pop("discovery.seed_hosts", None)
-        new_settings.pop("cluster.initial_master_nodes", None)
+        """ Zen1 doesn't know the new discovery settings, but they must be
+        translated instead of dropped: nodes which got an explicit
+        transport.tcp.port only ping their own port by default, so without
+        unicast hosts they never find each other and each one elects itself
+        as master."""
+        seed_hosts = new_settings.pop("discovery.seed_hosts", None)
+        master_nodes = new_settings.pop("cluster.initial_master_nodes", None)
+        if seed_hosts:
+            new_settings["discovery.zen.ping.unicast.hosts"] = seed_hosts
+        if master_nodes:
+            num_master_nodes = len(master_nodes.split(","))
+            new_settings["discovery.zen.minimum_master_nodes"] = num_master_nodes // 2 + 1
 
     return new_settings
 
@@ -201,12 +215,10 @@ class CrateCluster:
         self._nodes = nodes
 
     def start(self):
-        threads = []
-        for node in self._nodes:
-            t = Thread(target=node.start)
-            t.start()
-            threads.append(t)
-        [t.join() for t in threads]
+        with ThreadPoolExecutor(max_workers=len(self._nodes)) as executor:
+            futures = [executor.submit(node.start) for node in self._nodes]
+        for future in futures:
+            future.result()  # re-raise if a node didn't come up
 
     def stop(self):
         for node in self._nodes:
