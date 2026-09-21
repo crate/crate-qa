@@ -12,9 +12,11 @@ from collections.abc import Iterator
 from typing import Dict, Any, NamedTuple, Iterable, List, Optional, Tuple
 
 from faker.generator import random
-from cr8.run_crate import CrateNode, get_crate, _extract_version, parse_version
+from cr8.run_crate import CrateNode, cluster_state_200, get_crate, _extract_version, parse_version
 from cr8.insert_fake_data import SELLECT_COLS, Column, create_row_generator
 from cr8.insert_json import to_insert
+from crate.client.exceptions import ConnectionError as CrateConnectionError
+from crate.client.http import Client as CrateClient
 
 DEBUG = os.environ.get('DEBUG', 'false').lower() == 'true'
 
@@ -118,6 +120,74 @@ def wait_for_active_shards(cursor, num_active=0, timeout=60, f=1.2):
         print(f'=== {rs}')
         print('-' * 70)
     raise TimeoutError(f"Shards {num_active} didn't become active within {timeout}s.")
+
+
+def wait_for_http_ready(http_url: str, timeout=60, f=1.5):
+    """Wait until the node is ready to serve requests.
+
+    `CrateNode.start()` waits only up to 30s for the node to answer with a
+    `200` status and silently continues if it doesn't. A node which is up but
+    has no elected master yet, or which hasn't recovered its state yet,
+    answers with `503`. Since crate-python 2.3.0 `connect()` raises a
+    `ConnectionError` if all servers answer like that, so make sure the node
+    is ready before handing it ti a client.
+    """
+    waited = 0.0
+    duration = 0.1
+    while waited < timeout:
+        if cluster_state_200(http_url):
+            return
+        time.sleep(duration)
+        waited += duration
+        duration *= f
+    raise TimeoutError(f"Node {http_url} wasn't ready within {timeout}s.")
+
+
+def _retry_server_infos(timeout=60, f=1.2):
+    """Retry `Client.server_infos` while a node answers with a `503`.
+
+    A freshly started node can be unavailable for a while: until the cluster
+    state is recovered and a master is elected, and again for short periods
+    while the cluster forms. Since crate-python 2.3.0 `connect()` raises a
+    `ConnectionError`, instead of silently falling back to a default server
+    version, which made tests fail right after `cluster.start()`.
+    """
+    original = CrateClient.server_infos
+
+    @functools.wraps(original)
+    def server_infos(self, server):
+        waited = 0.0
+        duration = 0.1
+        while True:
+            try:
+                return original(self, server)
+            except CrateConnectionError:
+                if waited >= timeout:
+                    raise
+                time.sleep(duration)
+                waited += duration
+                duration *= f
+
+    # setattr: mypy rejects a plain assignment to a method
+    setattr(CrateClient, "server_infos", server_infos)
+
+
+_retry_server_infos()
+
+
+def _wait_on_start(node: CrateNode):
+    """Make `node.start()` block until the node is ready to serve requests.
+
+    `CrateNode.start()` can return while the node still answers with `503`, see `wait_for_http_ready`.
+    """
+    start = node.start
+
+    @functools.wraps(start)
+    def start_and_wait():
+        start()
+        wait_for_http_ready(node.http_url)
+
+    setattr(node, "start", start_and_wait)
 
 
 class VersionDef(NamedTuple):
@@ -284,6 +354,7 @@ class NodeProvider:
             java_magic=True,
         )
         setattr(n, "_settings", s)  # CrateNode does not hold its settings
+        _wait_on_start(n)
         self._add_log_consumer(n)
         self._on_stop.append(n)
         return (n, version_tuple)
