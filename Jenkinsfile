@@ -23,7 +23,7 @@ pipeline {
               (cd crate_src && git checkout ef43d5026b2c36387fa94f31f3f870d3ed3d12ca)
 
               export CRATE_VERSION=$(pwd)/crate_src
-              export CRATE_HEAP_SIZE=1500m
+              # export CRATE_HEAP_SIZE=1500m
 
               overall_status=0
 
