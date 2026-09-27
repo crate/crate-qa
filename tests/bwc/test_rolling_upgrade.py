@@ -9,6 +9,10 @@ from crate.qa.minio_svr import MinioServer, _is_up
 
 from crate.qa.tests import NodeProvider, insert_data, wait_for_active_shards, UpgradePath, assert_busy
 
+# The logical replication flow for partitioned tables requires https://github.com/crate/crate/pull/20292
+# available on or after 6.4.6.
+PARTITION_REPLICATION_MIN_VERSION = (6, 4, 6)
+
 ROLLING_UPGRADES_V5 = (
     UpgradePath('5.9.x', '5.10.x'),
 )
@@ -98,7 +102,9 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     new_shards = init_foreign_data_wrapper_data(conn, remote_conn, node.addresses.psql.port, remote_node.addresses.psql.port)
                     expected_active_shards += new_shards
                     if node.version >= (5, 10, 0):
-                        new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
+                        local_active_shards = expected_active_shards
+                        remote_active_shards = new_shards
+                        new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, local_active_shards, remote_active_shards, node.version)
                         expected_active_shards += new_shards
 
         for idx, node in enumerate(cluster):
@@ -140,7 +146,7 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
                     with connect(remote_node.http_url, error_trace=True) as remote_conn:
                         test_foreign_data_wrapper(self, conn, remote_conn)
                         if node.version >= (5, 10, 0):
-                            test_logical_replication_queries(self, conn, remote_conn)
+                            expected_active_shards += test_logical_replication_queries(self, conn, remote_conn, idx + 1, node.version)
 
         # Finally validate that all shards (primaries and replicas) of all partitions are started
         # and writes into the partitioned table while upgrading were successful
@@ -444,6 +450,7 @@ def init_foreign_data_wrapper_data(local_conn: Connection, remote_conn: Connecti
     wait_for_active_shards(c)
     wait_for_active_shards(rc)
 
+    # The same number of shards is added to local and remote clusters
     return new_shards
 
 
@@ -466,30 +473,54 @@ def test_foreign_data_wrapper(self, local_conn: Connection, remote_conn: Connect
     self.assertEqual(c.fetchall()[0][0], count + 1)
 
 
-def init_logical_replication_data(self, local_conn: Connection, remote_conn: Connection, local_transport_port: int, remote_transport_port: int, local_active_shards: int) -> int:
+def init_logical_replication_data(self, local_conn: Connection, remote_conn: Connection, local_transport_port: int, remote_transport_port: int, local_active_shards: int, remote_active_shards: int, version: tuple[int, int, int]) -> int:
     assert 4300 <= local_transport_port <= 4310 and 4300 <= remote_transport_port <= 4310
 
     c = local_conn.cursor()
-    c.execute("create table doc.x (a int) clustered into 1 shards with (number_of_replicas=0)")
-    c.execute("create publication p for table doc.x")
-
     rc = remote_conn.cursor()
+
+    c.execute("create table doc.x (a int) clustered into 1 shards with (number_of_replicas=0)")
     rc.execute("create table doc.rx (a int) clustered into 1 shards with (number_of_replicas=0)")
+
+    c.execute("create publication p for table doc.x")
     rc.execute("create publication rp for table doc.rx")
 
     rc.execute(f"create subscription rs connection 'crate://localhost:{local_transport_port}?user=crate&sslmode=sniff' publication p")
     c.execute(f"create subscription s connection 'crate://localhost:{remote_transport_port}?user=crate&sslmode=sniff' publication rp")
 
     new_shards = 2  # 1 shard for doc.x and another 1 shard for doc.rx
-    wait_for_active_shards(rc, new_shards)
+    wait_for_active_shards(rc, remote_active_shards + new_shards)
     wait_for_active_shards(c, local_active_shards + new_shards)
-    assert_busy(lambda: self.assertEqual(num_docs_x(rc), 0))
-    assert_busy(lambda: self.assertEqual(num_docs_rx(c), 0))
+    assert_busy(lambda: self.assertEqual(num_docs(rc, "doc.x"), 0))
+    assert_busy(lambda: self.assertEqual(num_docs(c, "doc.rx"), 0))
 
+    if version >= PARTITION_REPLICATION_MIN_VERSION:
+        c.execute("create table doc.x_partitioned (a int, p int) partitioned by (p) clustered into 1 shards with (number_of_replicas=0)")
+        c.execute("insert into doc.x_partitioned values (1, 0)")
+        c.execute("refresh table doc.x_partitioned")
+
+        rc.execute("create table doc.rx_partitioned (a int, p int) partitioned by (p) clustered into 1 shards with (number_of_replicas=0)")
+        rc.execute("insert into doc.rx_partitioned values (1, 0)")
+        rc.execute("refresh table doc.rx_partitioned")
+
+        c.execute("create publication p_partitioned for table doc.x_partitioned")
+        rc.execute("create publication rp_partitioned for table doc.rx_partitioned")
+
+        rc.execute(f"create subscription rs_partitioned connection 'crate://localhost:{local_transport_port}?user=crate&sslmode=sniff' publication p_partitioned")
+        c.execute(f"create subscription s_partitioned connection 'crate://localhost:{remote_transport_port}?user=crate&sslmode=sniff' publication rp_partitioned")
+
+        new_shards += 2  # Two initial partitions
+        wait_for_active_shards(rc, remote_active_shards + new_shards)
+        wait_for_active_shards(c, local_active_shards + new_shards)
+        assert_busy(lambda: self.assertEqual(num_docs(rc, "doc.x_partitioned"), 1))
+        assert_busy(lambda: self.assertEqual(num_docs(c, "doc.rx_partitioned"), 1))
+
+    # The same number of shards is added to local and remote clusters
     return new_shards
 
 
-def test_logical_replication_queries(self, local_conn: Connection, remote_conn: Connection):
+def test_logical_replication_queries(self, local_conn: Connection, remote_conn: Connection, partition: int, version: tuple[int, int, int]) -> int:
+    new_shards = 0
     c = local_conn.cursor()
     rc = remote_conn.cursor()
 
@@ -498,26 +529,61 @@ def test_logical_replication_queries(self, local_conn: Connection, remote_conn: 
         rc.execute("drop table doc.x")
         c.execute("drop table doc.rx")
 
-    count = num_docs_x(rc)
-    count2 = num_docs_rx(c)
+    num_docs_doc_x = num_docs(rc, "doc.x")
+    num_docs_doc_rx = num_docs(c, "doc.rx")
 
     c.execute("insert into doc.x values (1)")
     c.execute("refresh table doc.x")
     rc.execute("insert into doc.rx values (1)")
     rc.execute("refresh table doc.rx")
 
-    assert_busy(lambda: self.assertEqual(num_docs_x(rc), count + 1))
-    assert_busy(lambda: self.assertEqual(num_docs_rx(c), count2 + 1))
+    assert_busy(lambda: self.assertEqual(num_docs(rc, "doc.x"), num_docs_doc_x + 1))
+    assert_busy(lambda: self.assertEqual(num_docs(c, "doc.rx"), num_docs_doc_rx + 1))
+
+    if version >= PARTITION_REPLICATION_MIN_VERSION:
+
+        num_completed_iterations = partition - 1
+        num_docs_added_per_iter = 4
+        initial_num_rows = 1
+        expected_num_docs = num_docs_added_per_iter * num_completed_iterations + initial_num_rows
+
+        # Write to an existing partition 0
+        c.execute("insert into doc.x_partitioned values (1, 0)")
+        c.execute("refresh table doc.x_partitioned")
+        rc.execute("insert into doc.rx_partitioned values (1, 0)")
+        rc.execute("refresh table doc.rx_partitioned")
+        expected_num_docs += 1
+
+        assert_busy(lambda: self.assertEqual(num_docs(rc, "doc.x_partitioned"), expected_num_docs))
+        assert_busy(lambda: self.assertEqual(num_docs(c, "doc.rx_partitioned"), expected_num_docs))
+
+        # Create a new partition, then verify replication after its initial restore.
+        for val in (1, 2, 3):
+            c.execute("insert into doc.x_partitioned values (?, ?)", (val, partition))
+            c.execute("refresh table doc.x_partitioned")
+            rc.execute("insert into doc.rx_partitioned values (?, ?)", (val, partition))
+            rc.execute("refresh table doc.rx_partitioned")
+            expected_num_docs += 1
+
+            assert_busy(lambda: self.assertEqual(num_docs(rc, "doc.x_partitioned"), expected_num_docs))
+            assert_busy(lambda: self.assertEqual(num_docs(c, "doc.rx_partitioned"), expected_num_docs))
+
+        new_shards += 2  # One new shard each for x_partitioned and rx_partitioned
+
+    # The same number of shards is added to local and remote clusters
+    return new_shards
 
 
-def num_docs_x(cursor):
-    cursor.execute("select count(*) from doc.x")
-    return cursor.fetchall()[0][0]
-
-
-def num_docs_rx(cursor):
-    cursor.execute("select count(*) from doc.rx")
-    return cursor.fetchall()[0][0]
+def num_docs(cursor, table_name):
+    try:
+        cursor.execute(f"refresh table {table_name}")
+        cursor.execute(f"select count(*) from {table_name}")
+        return cursor.fetchall()[0][0]
+    except ProgrammingError as e:
+        if "ShardNotFoundException" not in str(e):
+            raise
+        # Let assert_busy retry while the subscriber is restoring shards.
+        raise AssertionError(str(e)) from e
 
 
 class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
@@ -555,7 +621,10 @@ class RollingUpgradeOidTest(NodeProvider, unittest.TestCase):
             with connect(remote_node.http_url, error_trace=True) as remote_conn:
                 new_shards = init_foreign_data_wrapper_data(conn, remote_conn, node.addresses.psql.port, remote_node.addresses.psql.port)
                 expected_active_shards += new_shards
-                new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, expected_active_shards)
+
+                local_active_shards = expected_active_shards
+                remote_active_shards = new_shards
+                new_shards = init_logical_replication_data(self, conn, remote_conn, node.addresses.transport.port, remote_node.addresses.transport.port, local_active_shards, remote_active_shards, node.version)
                 expected_active_shards += new_shards
 
         with connect(node.http_url, error_trace=True) as conn:
