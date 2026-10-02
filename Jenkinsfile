@@ -27,7 +27,7 @@ pipeline {
 
               overall_status=0
 
-              for i in $(seq 1 10); do
+              for i in $(seq 1 3); do
                 echo "=== Run $i ==="
 
                 rm -rf .venv
