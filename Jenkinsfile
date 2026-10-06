@@ -223,6 +223,16 @@ pipeline {
             '''
           }
         }
+        stage('Vertx tests') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk17' }
+          steps {
+            checkout scm
+            sh '''
+              (cd tests/client_tests/vertx && ./run.sh)
+            '''
+          }
+        }
         stage('Rust client tests') {
           agent {
             dockerfile {
