@@ -12,6 +12,7 @@ supported.
 import os
 import re
 import sys
+import time
 import logging
 import argparse
 import psycopg2
@@ -352,7 +353,89 @@ class RunMode:
     QUERIES_ONLY = 'queries_only'
 
 
+def _first_line(value, maxlen=400):
+    """Collapse a multi-line server error (CONTEXT stack) to something short."""
+    text = str(value).strip().splitlines()
+    head = text[0] if text else ''
+    return head[:maxlen] + ('...' if len(head) > maxlen else '')
+
+
+def _describe_inflight(host, port, limit=25, attempts=3, delay=2.0):
+    """Best-effort snapshot of what the cluster was busy with.
+
+    A circuit breaker error names the query that got *refused*, not the ones
+    that consumed the memory. sys.jobs shows what is still in flight and
+    sys.jobs_log what recently failed - between them the actual memory
+    consumers can be identified.
+
+    The breaker is global, so these diagnostic queries can themselves be
+    refused while the cluster is still over the limit: retry each one a few
+    times, and report each independently so one failure does not lose the rest.
+    """
+    def fmt_job(row):
+        return f'job {row[0]} started={row[1]} stmt={row[2]!r}'
+
+    def fmt_failed(row):
+        return f'ended={row[0]} error={_first_line(row[1])!r} stmt={row[2]!r}'
+
+    def fmt_node(row):
+        return f'node {row[0]} heap_used={row[1]} heap_max={row[2]}'
+
+    sections = (
+        ('in-flight statements (sys.jobs)',
+         'SELECT id, started, stmt FROM sys.jobs ORDER BY started LIMIT %s',
+         (limit,), fmt_job),
+        ('recently failed statements (sys.jobs_log)',
+         'SELECT ended, error, stmt FROM sys.jobs_log WHERE error IS NOT NULL '
+         'ORDER BY ended DESC LIMIT %s',
+         (limit,), fmt_failed),
+        ('heap per node (sys.nodes)',
+         "SELECT name, heap['used'], heap['max'] FROM sys.nodes",
+         None, fmt_node),
+    )
+
+    out = []
+    for title, stmt, params, fmt in sections:
+        rows = None
+        err = None
+        for attempt in range(attempts):
+            try:
+                conn = psycopg2.connect(
+                    f'host={host} port={port} user=crate dbname=doc')
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(stmt, params)
+                    rows = cursor.fetchall()
+                finally:
+                    conn.close()
+                break
+            except Exception as e:
+                err = e
+                if attempt + 1 < attempts:
+                    time.sleep(delay)
+        if rows:
+            out.append(f'  {title}:')
+            out.extend(f'    {fmt(row)}' for row in rows)
+        elif rows is not None:
+            out.append(f'  {title}: <none>')
+        else:
+            out.append(f'  {title}: <unavailable: {_first_line(err)}>')
+    return '\n\nin-flight state at failure time:\n' + '\n'.join(out)
+
+
 def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=RunMode.ALL):
+    try:
+        return _run_file(
+            filename, host, port, log_level, log_file, failfast, schema, mode)
+    except Exception as e:
+        inflight = _describe_inflight(host, port) if 'breaker' in str(e).lower() else ''
+        raise RuntimeError(
+            f'sqllogic file {filename} (schema={schema}) failed: '
+            f'{type(e).__name__}: {e}{inflight}'
+        ) from e
+
+
+def _run_file(filename, host, port, log_level, log_file, failfast, schema, mode=RunMode.ALL):
     """Run a sqllogic test file.
 
     mode controls which commands are executed:
@@ -387,7 +470,7 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=R
             try:
                 s_or_q.execute(cursor)
             except psycopg2.Error as e:
-                logger.info('%s; %s', s_or_q.query, e, extra=attr)
+                logger.error('%s; %s', s_or_q.query, e, extra=attr)
             except IncorrectResult as e:
                 if not any(p.match(s_or_q.query) for p in QUERY_WHITELIST):
                     logger.error('%s; %s', s_or_q.query, e, extra=attr)
@@ -396,7 +479,10 @@ def run_file(filename, host, port, log_level, log_file, failfast, schema, mode=R
                 else:
                     logger.debug('%s; %s', cmd[1], 'Query is whitelisted', extra=attr)
             except NotImplementedError as e:
-                logger.warn('%s; %s', s_or_q.query, e, extra=attr)
+                logger.error('%s; %s', s_or_q.query, e, extra=attr)
+            except Exception as e:
+                logger.error('%s; %s', s_or_q.query, e, extra=attr)
+
     finally:
         fh.close()
         cursor.execute('SELECT count(*) FROM sys.shards WHERE schema_name = %s', (schema,))
