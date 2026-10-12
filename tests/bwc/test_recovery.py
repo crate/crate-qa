@@ -8,33 +8,12 @@ from random import sample
 from crate.qa.tests import NodeProvider, insert_data, UpgradePath, assert_busy
 
 UPGRADE_PATHS = [
-    UpgradePath('4.2.x', '4.3.x'),
-    UpgradePath('4.3.x', '4.4.0'),
-    UpgradePath('4.4.x', '4.5.x'),
-    UpgradePath('4.5.x', '4.6.x'),
-    UpgradePath('4.6.x', '4.7.x'),
-    UpgradePath('4.7.x', '4.8.x'),
-    UpgradePath('4.8.x', '5.0.x'),
-    UpgradePath('5.0.x', '5.1.x'),
-    UpgradePath('5.1.x', '5.2.x'),
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x'),
-    UpgradePath('5.10.x', '6.0.x'),
-    UpgradePath('6.0.x', '6.0'),
-    UpgradePath('6.0', '6.1.x'),
-    UpgradePath('6.1.x', '6.1'),
-    UpgradePath('6.1', 'latest-nightly')
+    UpgradePath('6.3.x', '6.4.x'),
+    UpgradePath('6.4.x', '6.4'),
+    UpgradePath('6.4', 'latest-nightly')
 ]
-UPGRADE_PATHS_FROM_43 = [UpgradePath('4.3.x', '4.4.x')]
 
 
-@unittest.skip('Recovery tests are currently flaky, skip them until fixed')
 class RecoveryTest(NodeProvider, unittest.TestCase):
     """
     In depth testing of the recovery mechanism during a rolling restart.
@@ -425,94 +404,6 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             for result in res:
                 self.assertEqual(result['rowcount'], 1)
 
-    def test_operation_based_recovery(self):
-        """
-        Tests that we should perform an operation-based recovery if there were
-        some but not too many uncommitted documents (i.e., less than 10% of
-        committed documents or the extra translog) before we upgrade each node.
-        This is important when we move from the translog based to retention leases
-        based peer recoveries.
-        """
-
-        self._run_upgrade_paths(self._test_operation_based_recovery, UPGRADE_PATHS_FROM_43)
-
-    def _test_operation_based_recovery(self, path):
-        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
-        cluster.start()
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute('''
-                        create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" = 2,
-                        "soft_deletes.enabled" = true)
-                        ''')
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            insert_data(conn, 'doc', 'test', random.randint(100, 200))
-            c.execute('refresh table doc.test')
-
-            self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
-            num_docs = random.randint(0, 3)
-            if num_docs > 0:
-                insert_data(conn, 'doc', 'test', num_docs)
-
-            self._upgrade_to_mixed_cluster(cluster, path.to_version)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            num_docs = random.randint(0, 3)
-            if num_docs > 0:
-                insert_data(conn, 'doc', 'test', num_docs)
-            self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
-
-            # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            num_docs = random.randint(0, 3)
-            if num_docs > 0:
-                insert_data(conn, 'doc', 'test', num_docs)
-
-            self._assert_ensure_checkpoints_are_synced(conn, 'doc', 'test')
-
-    def test_turnoff_translog_retention_after_upgraded(self):
-        """
-        Verifies that once all shard copies on the new version, we should turn
-        off the translog retention for indices with soft-deletes.
-        """
-
-        self._run_upgrade_paths(self._test_turnoff_translog_retention_after_upgraded, UPGRADE_PATHS_FROM_43)
-
-    def _test_turnoff_translog_retention_after_upgraded(self, path):
-        cluster = self._new_cluster(path.from_version, self.NUMBER_OF_NODES)
-        cluster.start()
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            number_of_replicas = random.randint(0, 2)
-            c.execute('''
-                        create table doc.test(x int) clustered into 1 shards with( number_of_replicas =?,
-                        "soft_deletes.enabled" = true)
-                     ''', (number_of_replicas, ))
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            insert_data(conn, 'doc', 'test', random.randint(100, 200))
-            c.execute('refresh table doc.test')
-
-            num_docs = random.randint(0, 100)
-            if num_docs > 0:
-                insert_data(conn, 'doc', 'test', num_docs)
-
-            # update the cluster to the new version
-            self._upgrade_cluster(cluster, path.to_version, self.NUMBER_OF_NODES)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            c.execute('refresh table doc.test')
-            self._assert_translog_is_empty(conn, 'doc', 'test')
-
     def _assert_translog_is_empty(self, conn, schema, table_name):
         c = conn.cursor()
         c.execute('''select translog_stats['number_of_operations'], translog_stats['uncommitted_operations']
@@ -523,157 +414,11 @@ class RecoveryTest(NodeProvider, unittest.TestCase):
             self.assertEqual(r[0], 0)
             self.assertEqual(r[1], 0)
 
-    def test_auto_expand_indices_during_rolling_upgrade(self):
-        """
-        This test ensure that allocation filtering rules won't auto-expanding replicas
-        during a rolling upgrade unless all nodes are upgraded to 4.4 (latest).
-
-        See https://github.com/elastic/elasticsearch/pull/50361.
-        """
-
-        # Todo: Change upgrade path once 4.4 is released, pin to_version to 4.4 then.
-        self._run_upgrade_paths(self._test_auto_expand_indices_during_rolling_upgrade, UPGRADE_PATHS_FROM_43)
-
-    def _test_auto_expand_indices_during_rolling_upgrade(self, path):
-        number_of_nodes = 3
-        cluster = self._new_cluster(path.from_version, number_of_nodes)
-        cluster.start()
-
-        # all nodes without the primary
-        number_of_replicas = number_of_nodes - 1
-        number_of_replicas_with_excluded_node = number_of_replicas - 1
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-            c.execute('''select id from sys.nodes''')
-            node_ids = c.fetchall()
-            self.assertEqual(len(node_ids), number_of_nodes)
-
-            c.execute('''create table doc.test(x int) clustered into 1 shards with( "number_of_replicas" = ?)''',
-                      (f"0-{number_of_replicas}",))
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            # exclude one node from allocation, but this won't have any effect as all nodes are on the old version
-            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', (random.choice(node_ids)[0],))
-
-            # check that the replicas expanding automatically to all nodes, even that one is excluded
-            assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
-
-            self._upgrade_to_mixed_cluster(cluster, path.to_version)
-
-            # health is yellow because the replicas are expanded, but one could not be allocated as the node
-            # is excluded by allocation filtering
-            assert_busy(lambda: self._assert_is_yellow(conn, 'doc', 'test'))
-
-            # check that the replicas still expanding automatically to all nodes, even that one is excluded
-            assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas))
-
-            # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
-
-            # now that all nodes are on the same version including the path to expand replicas based on the
-            # allocation filtering, replicas are expanded only to 1 and the health is green
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            assert_busy(lambda: self._assert_number_of_replicas(conn, 'doc', 'test', number_of_replicas_with_excluded_node))
-
     def _assert_number_of_replicas(self, conn, schema, table_name, count):
         c = conn.cursor()
         c.execute('select count(id) from sys.shards where primary=false and table_name = ? and schema_name=?', (table_name, schema))
         number_of_replicas_allocated = c.fetchone()[0]
         self.assertEqual(count, number_of_replicas_allocated)
-
-    def test_retention_leases_established_when_promoting_primary(self):
-        self._run_upgrade_paths(self._test_retention_leases_established_when_promoting_primary, UPGRADE_PATHS_FROM_43)
-
-    def _test_retention_leases_established_when_promoting_primary(self, path):
-        number_of_nodes = 3
-        cluster = self._new_cluster(path.from_version, number_of_nodes)
-        cluster.start()
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-
-            number_of_shards = random.randint(1, 5)
-            number_of_replicas = random.randint(0, 1)
-
-            c.execute(
-                '''create table doc.test(x int) clustered into ? shards with(
-                    "number_of_replicas" = ?,
-                    "soft_deletes.enabled" = false,
-                    "allocation.max_retries" = 0,
-                    "unassigned.node_left.delayed_timeout" = '100ms'
-                    )''',
-                (number_of_shards, number_of_replicas,))
-
-            number_of_docs = random.randint(0, 10)
-            if number_of_docs > 0:
-                insert_data(conn, 'doc', 'test', number_of_docs)
-
-            if random.choice([True, False]):
-                c.execute('refresh table doc.test')
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            self._upgrade_to_mixed_cluster(cluster, path.to_version)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
-
-            # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
-
-    def test_retention_leases_established_when_relocating_primary(self):
-        self._run_upgrade_paths(self._test_retention_leases_established_when_relocating_primary, UPGRADE_PATHS_FROM_43)
-
-    def _test_retention_leases_established_when_relocating_primary(self, path):
-        number_of_nodes = 3
-        cluster = self._new_cluster(path.from_version, number_of_nodes)
-        cluster.start()
-
-        with connect(cluster.node().http_url, error_trace=True) as conn:
-            c = conn.cursor()
-
-            number_of_shards = random.randint(1, 5)
-            number_of_replicas = random.randint(0, 1)
-
-            c.execute(
-                '''create table doc.test(x int) clustered into ? shards with(
-                    "number_of_replicas" = ?,
-                    "soft_deletes.enabled" = false,
-                    "allocation.max_retries" = 0,
-                    "unassigned.node_left.delayed_timeout" = '100ms'
-                    )''',
-                (number_of_shards, number_of_replicas,))
-
-            number_of_docs = random.randint(0, 10)
-            if number_of_docs > 0:
-                insert_data(conn, 'doc', 'test', number_of_docs)
-
-            if random.choice([True, False]):
-                c.execute('refresh table doc.test')
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            self._upgrade_to_mixed_cluster(cluster, path.to_version)
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-
-            #  trigger a primary relocation by excluding the primary from this index
-            c.execute('''select node['id'] from sys.shards where primary=true and table_name='test' ''')
-            primary_id = c.fetchall()
-            self.assertTrue(primary_id)
-            c.execute('alter table doc.test set ("routing.allocation.exclude._id" = ?)', primary_id)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
-
-            # upgrade fully to the new version
-            self._upgrade_cluster(cluster, path.to_version, number_of_nodes)
-
-            assert_busy(lambda: self._assert_is_green(conn, 'doc', 'test'))
-            assert_busy(lambda: self._assert_ensure_peer_recovery_retention_leases_renewed_and_synced(conn, 'doc', 'test'))
 
     def _assert_ensure_peer_recovery_retention_leases_renewed_and_synced(self, conn, schema_name, table_name):
         c = conn.cursor()
