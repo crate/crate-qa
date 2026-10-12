@@ -27,6 +27,7 @@ References
 """
 import os
 
+from psycopg import connect
 import psycopg
 import psycopg.rows
 import unittest
@@ -187,22 +188,23 @@ async def exec_queries_pooled(test, uri):
     await pool.close()
 
 
-class Psycopg3AsyncTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
+def ensure_cratedb(node_provider: NodeProvider) -> str:
+    if "CRATEDB_URI" in os.environ:
+        crate_psql_url = os.environ["CRATEDB_URI"]
+    else:
+        (node, _) = node_provider._new_node(node_provider.CRATE_VERSION)
+        node.start()
+        psql_addr = node.addresses.psql
+        crate_address = f'{psql_addr.host}:{psql_addr.port}'
+        crate_psql_url = f'postgres://crate@{crate_address}/doc'
+    return crate_psql_url
 
-    def ensure_cratedb(self):
-        if "CRATEDB_URI" in os.environ:
-            crate_psql_url = os.environ["CRATEDB_URI"]
-        else:
-            (node, _) = self._new_node(self.CRATE_VERSION)
-            node.start()
-            psql_addr = node.addresses.psql
-            crate_address = f'{psql_addr.host}:{psql_addr.port}'
-            crate_psql_url = f'postgres://crate@{crate_address}/doc'
-        return crate_psql_url
+
+class Psycopg3AsyncTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         super().setUp()
-        self.crate_psql_url = self.ensure_cratedb()
+        self.crate_psql_url = ensure_cratedb(self)
 
     async def test_basic_statements(self):
         await exec_queries_pooled(self, self.crate_psql_url)
@@ -225,3 +227,21 @@ class Psycopg3AsyncTestCase(NodeProvider, unittest.IsolatedAsyncioTestCase):
         assert result.pgresult
 
         self.assertEqual(result.pgresult.command_status, command.encode(), msg=msg)
+
+
+
+class PsycopgTestCase(NodeProvider, unittest.TestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.uri = ensure_cratedb(self)
+
+    def test_pipelined_mode(self):
+        with connect(self.uri) as conn:
+            conn.execute("create table bl (id int primary key, x int)")
+
+        with connect(self.uri) as conn, conn.pipeline(), conn.cursor() as cur:
+            cur.execute("insert into tbl (id, x) values (1, 42)")
+            cur.execute("select x from tbl where id = %s", [1])
+            row = cur.fetchone()
+            self.assertEqual(row, (42,))
