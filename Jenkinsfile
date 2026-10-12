@@ -98,6 +98,21 @@ pipeline {
             '''
           }
         }
+        stage('Python bwc-recovery tests') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk17' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
+
+              (cd tests/bwc && python -m unittest -vvvf test_recovery.py)
+            '''
+          }
+        }
         stage('Python restart tests') {
           agent { label 'medium && x64' }
           steps {
