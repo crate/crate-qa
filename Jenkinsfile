@@ -238,6 +238,20 @@ pipeline {
             '''
           }
         }
+        stage('Vertx tests') {
+          agent { label 'medium && x64' }
+          tools { jdk 'jdk17' }
+          steps {
+            checkout scm
+            sh '''
+              rm -rf .venv
+              uv venv --python 3.14
+              source .venv/bin/activate
+              uv pip install -U -e .
+              (cd tests/client_tests/vertx && ./run.sh)
+            '''
+          }
+        }
         stage('Rust client tests') {
           agent {
             dockerfile {
