@@ -9,8 +9,9 @@ from crate.qa.tests import NodeProvider, insert_data, UpgradePath, assert_busy
 
 UPGRADE_PATHS = [
     UpgradePath('6.3.x', '6.4.x'),
-    UpgradePath('6.4.x', '6.4'),
-    UpgradePath('6.4', 'latest-nightly')
+    UpgradePath('6.4.x', '6.5.x'),
+    UpgradePath('6.5.x', '6.5'),
+    UpgradePath('6.5', 'latest-nightly')
 ]
 
 
