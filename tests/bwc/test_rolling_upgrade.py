@@ -30,10 +30,11 @@ ROLLING_UPGRADES_V6 = (
     UpgradePath('6.0.x', '6.1.x'),
     UpgradePath('6.1.x', '6.2.x'),
     UpgradePath('6.2.x', '6.3.x'),
-    UpgradePath('6.3.x', '6.3'),
-    UpgradePath('6.3', '6.4.x'),
+    UpgradePath('6.3.x', '6.4.x'),
     UpgradePath('6.4.x', '6.4'),
-    UpgradePath('6.4', 'latest-nightly'),
+    UpgradePath('6.4', '6.5.x'),
+    UpgradePath('6.5.x', '6.5'),
+    UpgradePath('6.5', 'latest-nightly'),
 )
 
 
