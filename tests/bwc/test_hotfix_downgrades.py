@@ -44,6 +44,11 @@ class HotfixDowngradeTest(NodeProvider, unittest.TestCase):
             # Skip downgrading to version 6.1.0 as it had OID serialization issues
             if node.version == (6, 1, 1):
                 return
+            # Skip downgrading from 6.5.1 to 6.5.0.
+            # Lucene was upgraded in 6.5.1, so a downgrade to 6.5.0 isn't possible.
+            # See: https://github.com/crate/crate/pull/20411.
+            if node.version == (6, 5, 1):
+                return
             new_version = (major, feature, i)
             with self.subTest(version=new_version):
                 node = self.upgrade_node(node, '.'.join(map(str, new_version)))
