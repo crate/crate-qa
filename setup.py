@@ -32,9 +32,7 @@ setup(
         'crate>=2.1.2',
         'cr8>=0.29.1',
         'Cython',
-        # https://github.com/MagicStack/asyncpg/releases/tag/v0.32.0
-        # causes failure of test_result_streaming_using_fetch_size
-        'asyncpg==0.31',
+        'asyncpg>=0.21',
         'pyodbc',
         'psycopg2-binary>=2.7.5',
         'psycopg[binary,pool]',
