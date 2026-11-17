@@ -18,23 +18,7 @@ ROLLING_UPGRADES_V5 = (
 )
 
 ROLLING_UPGRADES_V6 = (
-    UpgradePath('5.2.x', '5.3.x'),
-    UpgradePath('5.3.x', '5.4.x'),
-    UpgradePath('5.4.x', '5.5.x'),
-    UpgradePath('5.5.x', '5.6.x'),
-    UpgradePath('5.6.x', '5.7.x'),
-    UpgradePath('5.7.x', '5.8.x'),
-    UpgradePath('5.8.x', '5.9.x'),
-    UpgradePath('5.9.x', '5.10.x'),
-    UpgradePath('5.10.x', '6.0.x'),
-    UpgradePath('6.0.x', '6.1.x'),
-    UpgradePath('6.1.x', '6.2.x'),
-    UpgradePath('6.2.x', '6.3.x'),
-    UpgradePath('6.3.x', '6.4.x'),
-    UpgradePath('6.4.x', '6.4'),
-    UpgradePath('6.4', '6.5.x'),
-    UpgradePath('6.5.x', '6.5'),
-    UpgradePath('6.5', 'latest-nightly'),
+    UpgradePath('6.1.x', 'branch:b/6.2-hll-fix'),
 )
 
 
@@ -240,6 +224,15 @@ class RollingUpgradeTest(NodeProvider, unittest.TestCase):
         # Ensure aggregation with different intermediate input works, this was an regression for 4.1 <-> 4.2
         c.execute('''
             SELECT type, count(distinct value)
+            FROM doc.t1
+            GROUP BY type
+        ''')
+        c.fetchall()
+
+        # Ensure the hyperloglog_distinct works in a mixed cluster.
+        # Tracks regression in 6.2
+        c.execute('''
+            SELECT type, hyperloglog_distinct(value)
             FROM doc.t1
             GROUP BY type
         ''')
