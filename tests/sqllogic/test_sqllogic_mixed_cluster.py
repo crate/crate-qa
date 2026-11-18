@@ -71,7 +71,7 @@ class SqlLogicMixedClusterTest(NodeProvider, unittest.TestCase):
         settings = {
             'lang.js.enabled': 'true'
         }
-        version1 = '6.4.x'
+        version1 = '6.5.x'
         version2 = 'latest-nightly'
         # Workaround to get mixed cluster
         # Upgrading is not the focus of the test
