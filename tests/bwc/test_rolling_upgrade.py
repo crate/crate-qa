@@ -19,6 +19,10 @@ ROLLING_UPGRADES_V5 = (
 
 ROLLING_UPGRADES_V6 = (
     UpgradePath('6.1.x', 'branch:b/6.2-hll-fix'),
+    UpgradePath('branch:b/6.2-hll-fix', '6.3.x'),
+    UpgradePath('6.3.x', '6.4.x'),
+    UpgradePath('6.4.x', '6.4'),
+    UpgradePath('6.4', '6.5.x'),
 )
 
 
