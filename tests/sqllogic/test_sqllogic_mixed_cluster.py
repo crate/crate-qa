@@ -10,7 +10,10 @@ from sqllogic.sqllogictest import run_file
 
 INTEG_TESTS_PATH = pathlib.Path(__file__).parent.resolve() / 'integtests'
 CRATE_REPO = 'https://github.com/crate/crate.git'
-INTEG_TESTS_SRC = 'server/src/test/resources/integtests'
+INTEG_TESTS_SRCS = (
+    'server/src/test/resources/integtests '
+    'extensions/functions/src/test/resources/integtests'
+)
 
 
 def fetch_integ_tests():
@@ -23,10 +26,15 @@ def fetch_integ_tests():
         git clone --depth 1 --filter=blob:none --no-checkout {CRATE_REPO}
         cd crate
         git sparse-checkout init --cone
-        git sparse-checkout set {INTEG_TESTS_SRC}
+        git sparse-checkout set {INTEG_TESTS_SRCS}
         git checkout
         mkdir {INTEG_TESTS_PATH}
-        cp -r {INTEG_TESTS_SRC}/* {INTEG_TESTS_PATH}/
+        # Keep each source's path, so that test files with the same name in
+        # different modules don't overwrite each other.
+        for src in {INTEG_TESTS_SRCS}; do
+            mkdir -p {INTEG_TESTS_PATH}/$src
+            cp -r $src/* {INTEG_TESTS_PATH}/$src/
+        done
         cd /tmp && rm -rf crate-checkout
     '''
     subprocess.run(['bash', '-c', script], check=True)
